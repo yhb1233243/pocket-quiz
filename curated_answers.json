@@ -1,0 +1,462 @@
+{
+  "写出Java的四类八种基本数据类型": {
+    "oral": "Java 基本数据类型分为四类八种：整数类 byte(1)、short(2)、int(4)、long(8)；浮点类 float(4)、double(8)；字符类 char(2)；布尔类 boolean(理论1位，JVM常按int/byte处理)。",
+    "reason": "- 默认转换：低精度向高精度自动转，高向低需显式强转。\n- 包装类对应：`Integer`, `Character`, `Boolean` 等，支持自动拆装箱，数值在 -128 到 127 会走常量缓存池。",
+    "pit": "浮点运算绝对不能用 float/double 做金额计算，会出现精度丢失；必须用 `BigDecimal` 且推荐使用 `String` 构造入参。"
+  },
+  "& 和 && 的区别": {
+    "oral": "核心区别在「短路特性」和「运算范围」。作为逻辑运算时，`&&` 具有短路功能，左边为 false 右边直接不执行；`&` 无论左边结果如何，两边都必定执行。此外 `&` 还可以作为整数的按位与运算符。",
+    "reason": "- `&&`：常用于避免空指针防护，如 `if (user != null && user.isActive())`。\n- `&`：位运算高效掩码计算或权限判断，逻辑运算时极少在 if 里使用。",
+    "pit": "笔试常考侧边效应，例如 `(a++ > 1) && (b++ > 1)`，短路发生时 b 不会自增。"
+  },
+  "实例变量和局部变量的区别是什么？": {
+    "oral": "主要在「声明位置、作用域、生命周期和默认初始值」四方面不同。实例变量声明在类中方法外，随对象创建存在堆中，有默认值（如 0、false、null）；局部变量声明在方法或代码块中，随调用入栈，方法结束即出栈销毁，且必须先手动赋初值才能使用。",
+    "reason": "- 内存位置：实例变量存在堆（Heap）内对象实例中；局部变量存在栈帧的局部变量表（Local Variable Table）。\n- 线程安全：局部变量属于线程私有栈，只要不逃逸通常天然线程安全；实例变量多线程共享，需做并发同步控制。",
+    "pit": "局部变量若未手动初始化直接读取，Java 编译器会直接报编译错误；而对象的实例字段即使不赋值也会由 JVM 填入零值。"
+  },
+  "static关键字都能修饰什么？ 都有什么特点": {
+    "oral": "static 能修饰变量、方法、代码块和内部类。核心特点是「属于类本身而非单个实例」，在类加载的初始化阶段就已确定，所有实例共享同一份，可以直接通过类名调用而无需 new 对象。",
+    "reason": "- 静态变量/方法：内存驻留于方法区/元空间，不可访问外部非静态成员或调用 `this`/`super`。\n- 静态代码块：类加载初始化阶段仅执行一次，常用于全局只读配置或驱动类初始化。\n- 静态内部类：不隐式持有外部类实例的引用，因此不会因生命周期不一致引发内存泄漏。",
+    "pit": "静态方法不支持运行时多态重写（Override），子类同名静态方法只是隐藏（Hide）父类方法。"
+  },
+  "String、StringBuilder 与 StringBuffer 的区别": {
+    "oral": "String 是不可变对象（Java 9 之前底是 char[]，Java 9+ 改为 byte[] 加编码标识），每次修改都会产生新对象；StringBuilder 和 StringBuffer 是可变字符序列，支持原地 append，其中 StringBuilder 性能最高但非线程安全，StringBuffer 所有核心方法加了 synchronized 保证线程安全但性能较慢。",
+    "reason": "- 性能对比：单线程字符串频繁拼接首选 `StringBuilder`。\n- 常量折叠：编译期形如 `\"a\" + \"b\"` 会被 javac 自动优化为 `\"ab\"`；循环内部 `+` 操作容易生成大量临时 StringBuilder，应显式复用单个 StringBuilder。",
+    "pit": "多线程环境下直接操作 StringBuilder 会发生索引越界或字符覆盖；单线程下盲目使用 StringBuffer 会带来无谓的监视器锁竞争开销。"
+  },
+  "==和equals()的区别": {
+    "oral": "`==` 对基本类型比较的是值，对引用类型比较的是内存堆地址；`equals()` 是 Object 类的方法，默认实现也是比较内存地址（等同于 `==`），但像 String、Integer 等类重写了 `equals()`，改成了逐字段比较内容是否相等。",
+    "reason": "- 自定义类原则：重写 `equals` 时，必须同时重写 `hashCode`。\n- 哈希一致性：如果两个对象 `equals` 返回 true，其 `hashCode` 必须相等；反之 `hashCode` 相等对象不一定 `equals`（存在哈希冲突）。",
+    "pit": "重写 equals 但忘记重写 hashCode 时，放入 HashMap 或 HashSet 会出现找不到对应 Key 或集合去重失效的严重 Bug。"
+  },
+  "深拷贝和浅拷贝": {
+    "oral": "浅拷贝只复制当前对象的本身及基础数据类型的成员变量，如果包含引用类型字段，则拷贝出的对象和原对象指向同一个子对象内存地址；深拷贝则是递归复制整个对象图，原对象与拷贝对象的所有内部引用全部完全独立，互不影响。",
+    "reason": "- 浅拷贝实现：实现 `Cloneable` 接口并调用 `super.clone()` 默认就是浅拷贝。\n- 深拷贝实现常见方式：\n  1. 手动逐层 new 对象并设值；\n  2. 采用序列化与反序列化（如基于 JSON、Kryo、JDK 原生 Serializable）；\n  3. 构造器拷贝复制。",
+    "pit": "直接用 `super.clone()` 时，一旦修改副本的 List 或关联子对象属性，原对象内部也会同时被篡改。"
+  },
+  "JDK1.8版本中HashMap的内部结构": {
+    "oral": "JDK 1.8 中 HashMap 采用「数组 + 单向链表 + 红黑树」结构。默认初始容量 16，负载因子 0.75。当桶内链表节点数达到 8 且总数组容量达到 64 时，链表会树化为红黑树；若容量不足 64 则优先通过扩容解决冲突；当树节点减少到 6 时，会退化回普通单向链表。",
+    "reason": "- 寻址计算：通过扰动函数 `(h = key.hashCode()) ^ (h >>> 16)` 降低冲突，再通过 `hash & (n - 1)` 快速取模定位桶下标。\n- 扩容优化：扩容为 2 倍大小，节点要么留在原位，要么移动到「原下标 + 旧容量」位置，通过 `hash & oldCap` 是否为 0 一次判断，省去了 JDK 1.7 时代昂贵的重新 hash 计算。",
+    "pit": "HashMap 是非线程安全的，并发 put 会导致数据丢失或扩容脏读；如需并发安全必须使用 `ConcurrentHashMap`。"
+  },
+  "JDK8中的HashMap为什么要使用红黑树？": {
+    "oral": "主要是为了解决哈希碰撞严重或遭遇到恶意 Hash 碰撞攻击时链表退化的问题。单向链表在极差情况下的查询和插入时间复杂度会劣化为 O(n)；引入红黑树之后，最坏情况下的查询、插入与删除时间复杂度都能稳定在 O(log n)，显著提升了极端场景下的稳定性和安全性。",
+    "reason": "- 为什么不用 AVL 树？AVL 树是绝对严格平衡二叉树，插入和删除时自旋旋转开销过大；红黑树对平衡的要求稍宽松，综合插入、删除与查找性能最均衡。\n- 为什么不一开始就用红黑树？单个红黑树 TreeNode 占用的内存是普通 Node 节点的两倍左右，在少量节点时链表寻址速度甚至更快，内存也更省。",
+    "pit": "根据泊松分布，正常随机 Hash 命中同一桶 8 次的概率小于千万分之一，一旦达到 8 往往预示着严重的分布倾斜或哈希冲突风险。"
+  },
+  "JDK 1.8 ConcurrentHashMap如何保证并发": {
+    "oral": "JDK 1.8 的 ConcurrentHashMap 废弃了 1.7 的分段锁（Segment）设计，改用了「Node 数组 + CAS + synchronized 锁桶头节点」的细粒度锁机制，锁粒度精确到了单个哈希桶的首节点，并发读完全无锁（依靠 volatile 保证可见性），并发写入并发度可达数组长度级别。",
+    "reason": "- 写入流程：如果目标桶头节点为 null，直接通过 CAS 尝试初始化并填入；若已存在头节点，则使用 `synchronized` 锁住该头节点，遍历链表或红黑树完成写入。\n- 扩容协助：支持多线程协同搬迁扩容（Transfer），遇到 `ForwardingNode` 标记节点时，其他工作线程会主动加入搬迁任务加速扩容。",
+    "pit": "ConcurrentHashMap 的 key 和 value 均严禁为 null；在并发判断再执行（如 `if (!map.containsKey(k)) map.put(k, v)`）时仍然存在竞态条件，必须使用 `computeIfAbsent` 等原子复合方法。"
+  },
+  "ArrayList和LinkedList的区别": {
+    "oral": "核心区别在底层数据结构：ArrayList 底层是动态 Object[] 数组，支持通过下标 O(1) 随机访问，尾部追加极快，但中间插入/删除需搬迁元素平均 O(n)；LinkedList 底层是双向链表，插入和删除只需要修改前后指针 O(1)，但不支持下标随机访问，查找任意元素必须从头/尾双向遍历 O(n)。",
+    "reason": "- 空间开销：ArrayList 扩容时会有约 1.5 倍的预留空余空间；LinkedList 每个节点都要额外存储前驱和后继两个指针引用，且链表节点碎片化，CPU 缓存命中率（Cache Locality）远落后于连续内存的 ArrayList。\n- 实际选型：生产绝大部分业务场景都首选 `ArrayList`，只有在极其频繁在头尾插入删除的特殊队列模型下才考虑 `LinkedList` 或直接用 `ArrayDeque`。",
+    "pit": "不要以为 LinkedList 插入就一定比 ArrayList 快：如果插入操作前需要先通过 index 遍历定位位置，LinkedList 遍历本身的 O(n) 耗时往往比数组元素整体内存平移（`System.arraycopy` 本地指令）还要慢很多。"
+  },
+  "创建多线程的四种方式": {
+    "oral": "四种方式：1. 继承 `Thread` 类重写 run；2. 实现 `Runnable` 接口并传入 Thread；3. 实现 `Callable` 接口配合 `FutureTask`（支持返回值和异常抛出）；4. 使用 `ExecutorService` 线程池（生产环境唯一推荐方式，避免频繁启停线程开销）。",
+    "reason": "- 线程本质：在现代 Linux + OpenJDK 体系下，Java 的一个工作线程 1:1 映射为一个操作系统内核轻量级进程（KWP）。\n- 接口 vs 继承：Java 是单继承机制，实现 Runnable/Callable 接口更有利于面向接口编程解耦，并便于任务提交给线程池复用。",
+    "pit": "生产环境严禁在业务请求中随处 `new Thread()`，会导致系统线程数失控引发 `OutOfMemoryError: unable to create new native thread`。"
+  },
+  "ThreadPoolExecutor对象有哪些参数？都有什么作用？怎么设定核心线程数和最大线程数？拒绝策略有哪些？ [重点]": {
+    "oral": "ThreadPoolExecutor 核心有 7 个参数：corePoolSize（核心线程数）、maximumPoolSize（最大线程数）、keepAliveTime（非核心线程存活空闲时间）、unit（时间单位）、workQueue（任务阻塞队列）、threadFactory（线程创建工厂）、handler（饱和拒绝策略）。",
+    "reason": "- 任务提交流程：新任务进来 -> 小于 corePoolSize 直接起核心线程 -> 达到 corePoolSize 则排队进阻塞队列 -> 队列已满且线程数 < max 则启动非核心线程应急 -> 达到 max 且队列已满触发拒绝策略。\n- 4大拒绝策略：`AbortPolicy`（直接抛 RejectedExecutionException，默认）、`CallerRunsPolicy`（让调用者主线程自己执行，有天然降速背压效果）、`DiscardPolicy`（静默丢弃新任务）、`DiscardOldestPolicy`（丢弃队列头最老的任务再重试）。\n- 参数设定经验：CPU 密集型设为 `CPU核数 + 1`；IO 密集型建议设为 `2 * CPU核数` 或 `CPU核数 / (1 - 阻塞系数)`，阻塞系数常在 0.8~0.9，最终需结合监控压测动态调优。",
+    "pit": "绝对严禁直接使用 `Executors.newFixedThreadPool()` 或 `Executors.newCachedThreadPool()`，前者默认 LinkedBlockingQueue 无界（会导致 OOM 堆溢出），后者允许创建最大 Integer.MAX_VALUE 线程（会导致 OOM 爆系统线程）。"
+  },
+  "synchronized底层实现是什么？Lock底层是什么？有什么区别？": {
+    "oral": "synchronized 是 JVM 维度的内置监视器锁（基于 Monitor 及对象头的 Mark Word 实现，JDK 1.6 之后支持无锁、偏向锁、轻量级锁、重量级锁的逐级膨胀自旋优化）；Lock 是 JUC 包提供的 API 级别同步接口，底层基于 AQS（AbstractQueuedSynchronizer）抽象队列同步器，依靠 volatile 的 state 变量配合 CAS 操作和 LockSupport 线程阻塞唤醒实现。",
+    "reason": "- 核心对比：\n  1. 语法层面：synchronized 是语言关键字，异常时 JVM 会自动释放锁；Lock 必须手动在 `finally` 块中调用 `unlock()` 防止死锁。\n  2. 功能灵活性：Lock 支持超时获取（`tryLock`）、支持响应中断（`lockInterruptibly`）、支持公平与非公平锁切换，以及支持与多 Condition 条件队列解耦配合。\n  3. 性能：低竞争下两者相差无几，在极高并发竞争下，可精细调度的 ReentrantLock 通常更可控稳定。",
+    "pit": "Lock 的释放一定要放在 `finally` 块首行，且 `lock.lock()` 建议写在 `try` 块外部，避免获取锁抛异常后在 finally 中执行非法释放引发 IllegalMonitorStateException。"
+  },
+  "说一下JVM运行时数据区？": {
+    "oral": "JVM 运行时数据区主要包含 5 部分：线程私有的程序计数器（记录当前字节码执行行号）、虚拟机栈（保存每个方法调用的栈帧，含局部变量表、操作数栈等）、本地方法栈（服务 Native C/C++ 方法）；以及所有线程共享的堆（Heap，存放几乎所有对象实例和数组，GC 主战场）和方法区（Method Area，JDK 8 后落地为本地内存的元空间 Metaspace，存放类元数据、常量池等）。",
+    "reason": "- 线程独享 vs 共享：栈和计数器随线程生灭，不涉及垃圾回收；堆和元空间由 GC 自动管理。\n- 常见溢出：方法调用链过深报 `StackOverflowError`；对象无节制增长堆占满报 `OutOfMemoryError: Java heap space`；类加载过多或动态代理类暴增报 `OutOfMemoryError: Metaspace`。",
+    "pit": "JDK 8 移除了永久代（PermGen），改用本地内存的元空间（Metaspace），但元空间如果不加 `-XX:MaxMetaspaceSize` 限制，大量动态生成类依然会耗尽物理服务器宿主机内存。"
+  },
+  "请谈谈你对双亲委派机制的理解": {
+    "oral": "双亲委派机制是指：当一个类加载器收到类加载请求时，自己不会先尝试加载，而是先把请求委派给父类加载器，依次向上逐级委托，直到最顶层的启动类加载器（Bootstrap ClassLoader）。只有当父加载器在自己负责的搜索路径中找不到该类时，子加载器才会尝试自己去加载。",
+    "reason": "- 作用价值：保证 Java 核心核心类库的安全和单一份额（防止用户自己写一个恶意的 `java.lang.String` 篡改核心系统行为）。\n- 层次结构：BootstrapClassLoader -> Extension/PlatformClassLoader -> ApplicationClassLoader -> 自定义加载器。\n- 破坏双亲委派场景：\n  1. SPI 机制（如 JDBC 驱动，通过线程上下文类加载器 Thread.currentThread().getContextClassLoader() 倒挂让核心库调用用户类）；\n  2. Tomcat 等 Web 容器实现应用间的隔离部署与热加载；\n  3. OSGi 模块化动态化部署。",
+    "pit": "破坏双亲委派通常通过重写自定义 ClassLoader 的 `loadClass` 方法来实现；如果只是想增加自定义查找逻辑而不破坏机制，只需重写 `findClass` 方法即可。"
+  },
+  "怎么判断对象是否可以被回收？": {
+    "oral": "JVM 采用的是「可达性分析算法（Reachability Analysis）」而非引用计数法。从一组被称为 GC Roots 的根对象出发向下搜索引用链，如果一个对象到所有 GC Roots 都没有任何引用链相连，即证明该对象不可达，随后经历 finalize 判定周期后即可判定为垃圾对象进行回收。",
+    "reason": "- 可以作为 GC Roots 的对象主要包括：\n  1. 虚拟机栈（栈帧中的局部变量表）引用的对象；\n  2. 方法区中类静态变量引用的对象；\n  3. 方法区中常量引用的对象；\n  4. 本地方法栈 JNI（Native 方法）引用的对象；\n  5. JVM 内部机制常驻引用（如 Class 对象、异常对象、系统类加载器）。",
+    "pit": "为什么不用引用计数法？因为引用计数法无法解决对象之间「相互循环引用」的问题，即使外界全都不用了，内部两两计数器不为 0 就永远无法释放。"
+  },
+  "请解释什么是脏读、不可重复读和幻读。": {
+    "oral": "这三个是并发事务引发的数据不一致现象：\n- 脏读：事务 A 读到了事务 B 尚未提交的修改数据，若 B 随后回滚，A 读到的就是彻底无效的脏数据；\n- 不可重复读：事务 A 内部前后两次读取同一行数据，由于中间事务 B 提交了 update/delete，导致两次读取内容不一致；\n- 幻读：事务 A 按照同一条件范围查询多次，由于事务 B 提交了新 insert 插入符合条件的数据，导致 A 再次查询时凭空多出了一些行，如同产生幻觉。",
+    "reason": "- 四大隔离级别解决情况：\n  - Read Uncommitted（读未提交）：三者皆无法解决；\n  - Read Committed（读已提交）：解决脏读，不可重复读和幻读仍存在；\n  - Repeatable Read（可重复读）：解决脏读和不可重复读（InnoDB 通过 MVCC + Next-Key Lock 极大程度防住了幻读）；\n  - Serializable（串行化）：强制加锁串行执行，彻底解决所有并发冲突，但并发性能极差。",
+    "pit": "MySQL InnoDB 引擎默认隔离级别是「可重复读（Repeatable Read）」，它通过快照读（MVCC 快照）避免普通 select 幻读，通过当前读的间隙锁（Next-Key Lock）避免加锁写操作中的幻读。"
+  },
+  "MySQL聚簇和非聚簇索引的区别": {
+    "oral": "聚簇索引（Clustered Index）的叶子节点直接存储了整行完整的物理数据记录，数据与索引绑定在一起（每个表有且仅能有一个聚簇索引，InnoDB 通常是主键）；非聚簇索引（二级索引/辅助索引）的叶子节点只存储该索引本身的列值以及对应记录的主键 ID，通过二级索引查询非索引字段时，需要拿主键回到聚簇索引中再查一次，这个动作称为「回表（Bookmark Lookup）」。",
+    "reason": "- 避免回表：建立联合索引覆盖查询所需的全部字段，形成「覆盖索引（Covering Index）」，在二级索引树上就能直接拿全结果，大幅削减随机磁盘 I/O。\n- 存储组织：InnoDB 按照主键物理顺序组织 B+ 树，因此主键推荐自增单调递增，可以避免频繁的页分裂（Page Split）和碎片整理。",
+    "pit": "MyISAM 存储引擎全部都是非聚簇索引，其数据文件和索引文件是完全分离的，叶子节点保存的是指向数据文件实际物理字节偏移量的地址指针。"
+  },
+  "MySQL中的MVCC是什么？": {
+    "oral": "MVCC（Multi-Version Concurrency Control，多版本并发控制）是一种无锁提高并发读写性能的机制。它通过在每行记录后维护隐藏列（trx_id 事务版本号、roll_pointer 回滚指针）与 Undo Log 版本链，配合事务启动时生成的 Read View 读视图，实现「读不加锁、读写不冲突」，让读操作可以看见当前事务可读的历史快照版本。",
+    "reason": "- Read View 四个关键字段：\n  1. `m_ids`：生成该 Read View 时系统活跃未提交的事务 ID 列表；\n  2. `min_trx_id`：活跃事务中最小的事务 ID；\n  3. `max_trx_id`：未来将被分配的下一个事务 ID（即当前最大事务 ID + 1）；\n  4. `creator_trx_id`：创建该 Read View 的事务自身 ID。\n- RC 与 RR 级别区别：RC（读已提交）每次普通 select 都会重新生成最新的 Read View，因此能读到已提交的更新；RR（可重复读）仅在第一次 select 时生成一份 Read View 并沿用到事务结束，从而做到前后读到的快照完全一致。",
+    "pit": "MVCC 仅对「快照读（普通的 SELECT 语句）」生效；如果执行的是「当前读（如 SELECT ... FOR UPDATE、UPDATE、DELETE）」，仍然会读取最新记录并加行锁或间隙锁。"
+  },
+  "深入谈谈对Ioc的理解？": {
+    "oral": "IoC（Inversion of Control，控制反转）是一种软件架构设计思想。原本由业务代码主动使用 `new` 关键字创建和管理依赖对象的主动权，反转交给由外部容器（如 Spring IoC Container）负责对象的实例化、依赖配置和全生命周期托管。它的核心目的是将组件间强耦合的关系解除为松耦合，提升系统可维护性与测试便利性。",
+    "reason": "- 实现手段：DI（Dependency Injection，依赖注入）是 IoC 最核心落地实现手段（常用构造器注入、Setter 注入与注解注入）。\n- 核心容器职责：读取配置元数据 -> 解析为 BeanDefinition -> 反射实例化对象 -> 属性填充与依赖组装 -> 经历生命周期扩展链（BeanPostProcessor 等）生成可用组件。",
+    "pit": "IoC 虽然简化了解耦，但盲目滥用字段注解 `@Autowired` 容易隐藏深层循环依赖和架构不合理，官方推荐优先使用构造器注入以保证不可变性和更明确的契约依赖。"
+  },
+  "Spring 中的 bean 生命周期?": {
+    "oral": "Spring Bean 生命周期总体可以归纳为四步：1. 实例化（通过反射 createBeanInstance 分配堆内存）；2. 属性赋值（populateBean 完成依赖注入）；3. 初始化（先回调 Aware 接口知晓容器环境，再执行 BeanPostProcessor 前置处理，接着执行自定义 init 初始化方法，最后执行 BeanPostProcessor 后置处理生成 AOP 代理）；4. 销毁（容器关闭时回调 DisposableBean 或自定义 destroy 方法）。",
+    "reason": "- 关键钩子顺序：\n  1. `InstantiationAwareBeanPostProcessor`（拦截实例化前后）；\n  2. 构造方法实例化；\n  3. 属性填充（DI）；\n  4. `BeanNameAware` / `BeanFactoryAware` / `ApplicationContextAware`；\n  5. `BeanPostProcessor.postProcessBeforeInitialization`；\n  6. `@PostConstruct` -> `InitializingBean.afterPropertiesSet` -> xml `init-method`；\n  7. `BeanPostProcessor.postProcessAfterInitialization`（AOP 动态代理常在此处替换包装）；\n  8. 容器关闭回调销毁流程。",
+    "pit": "AOP 代理对象通常是在 `postProcessAfterInitialization` 之后才被替换生成的；如果在构造函数或 `@PostConstruct` 中通过 `this` 调用内部切面方法，切面逻辑不会生效，因为此时还只是原始的目标对象。"
+  },
+  "Spring 怎么解决循环依赖问题？": {
+    "oral": "Spring 通过「三级缓存机制」解决了「单例模式下 Setter / 字段注入」的循环依赖问题（无法解决构造器循环依赖和 prototype 原型作用域循环依赖）。在对象实例化后、初始化前，将获取对象提前引用的 ObjectFactory 工厂提前暴露到三级缓存中，使得下游对象可以提前获取未完全成熟的半成品对象引用，完成属性填充。",
+    "reason": "- 三级缓存定义：\n  1. 一级缓存 `singletonObjects`：存放完全初始化完成、可以直接使用的成熟单例 Bean；\n  2. 二级缓存 `earlySingletonObjects`：存放提前暴露的早期半成品 Bean（已实例化，尚未初始化填充完整属性，用于解决多重循环依赖时保持单例）；\n  3. 三级缓存 `singletonFactories`：存放包装了 `getEarlyBeanReference` 的 `ObjectFactory` lambda 表达式，用于在发生循环依赖时提前触发 AOP 代理生成。\n- 为什么必须是三级而不是二级？主要是为了 AOP。Spring 设计原则是尽量延迟到初始化后置处理才创建代理；三级缓存保证了在没有循环依赖时不提前创建代理，而在发生循环依赖时又能够确保提前生成的代理对象保持单例全局唯一。",
+    "pit": "构造器循环依赖会导致在调用构造方法那一刻对象根本无法完成内存实例化，无法进入三级缓存，会直接报 `BeanCurrentlyInCreationException`。"
+  },
+  "Spring Boot 自动配置原理？": {
+    "oral": "Spring Boot 核心靠 `@SpringBootApplication` 复合注解下的 `@EnableAutoConfiguration` 驱动。容器启动时利用 `AutoConfigurationImportSelector`，扫描所有依赖 jar 包下的 `META-INF/spring.factories`（或 Spring Boot 3+ 的 `META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports`）文件，加载预定义的自动配置类，并结合 `@ConditionalOnClass`、`@ConditionalOnMissingBean` 等一系列条件装配注解，动态决定是否注入对应组件。",
+    "reason": "- 核心三要素：\n  1. Starter 场景启动器：负责把相关的依赖 jar 坐标打包传递进来；\n  2. 自动配置类：带有 `@Configuration` 的 JavaConfig，里面预埋了常见组件的默认 Bean 装配规则；\n  3. 条件装配机制（Conditional）：只有当项目具备特定 class 依赖且用户没有显式声明自定义 Bean 时才默认激活，保障了「约定优于配置」且不剥夺用户的定制自由度。",
+    "pit": "自己写的 Bean 如果名称或类型与 Starter 自动配置冲突，通常自定义 Bean 会优先起效（因为 `@ConditionalOnMissingBean` 判定已存在），排查配置不生效时优先断点跟踪该条件匹配日志报告。"
+  },
+  "什么是缓存击穿、缓存穿透、缓存雪崩？": {
+    "oral": "三者都是大量请求直接击穿缓存压垮后端数据库的灾难场景：\n1. 缓存穿透：请求查询一个数据库中压根不存在的数据，缓存和 DB 都查不到，恶意高频请求次次透传到 DB；\n2. 缓存击穿：某个并发访问极高的热点 Key 突然在某一刻过期失效，瞬时海量请求并发打到数据库；\n3. 缓存雪崩：大量不同的 Key 采用了相同的过期时间，导致在某一时间段集中大面积失效，或者 Redis 整个服务集群宕机，所有流量倾泻到底层数据库。",
+    "reason": "- 解决方案体系：\n  - 防穿透：入参前置校验、缓存空对象（设置较短 TTL）、在前端或网关层使用「布隆过滤器（Bloom Filter）」快速拦截非法 ID。\n  - 防击穿：热点 Key 逻辑不过期（后台异步线程自动续期）、查询数据库时使用「分布式互斥锁（SETNX）」只放行一个请求回源更新缓存。\n  - 防雪崩：为 Key 的过期时间增加随机扰动偏差（如 10~60 秒随机数），分散失效时间点；配置多节点高可用哨兵/集群，并开启限流降级（Sentinel）。",
+    "pit": "布隆过滤器存在一定的误判率（判不存在则绝对不存在，判存在可能微小概率误判），且默认不支持元素物理删除（需用计数布隆过滤器变种）。"
+  },
+  "如何解决Redis和数据库的一致性问题？": {
+    "oral": "生产环境通常采用「Cache-Aside 模式（旁路缓存）」：读数据先查缓存，没有再读库并回写缓存；写数据时「先更新数据库，再删除缓存」。为应对删缓存失败或高并发极端并发写读覆盖，业界黄金落地方案是「先更库，再删缓存 + 延迟双删兜底」或「监听 MySQL Binlog（如使用 Canal）异步可靠删除缓存」。",
+    "reason": "- 为什么删缓存而不是更新缓存？因为许多缓存字段是多表复杂计算的结果，频繁写操作下每次更新缓存成本极高且往往是无用功（惰性计算更划算）；同时并发更新缓存极易发生写顺序错乱覆盖。\n- 为什么先更库后删缓存？如果先删缓存，线程 A 删完后、更库前，线程 B 进来发现缓存为空去查了旧库数据并回写缓存，会导致缓存永久残留旧脏数据。而后更库在极小并发窗口下才可能发生，配合消息队列重试和 Canal 能兜底 99.99% 的场景。",
+    "pit": "分布式系统中缓存与数据库无法保证 100% 强一致，核心关键是要和业务沟通一致性容忍度，以最终一致性为工程目标。"
+  },
+  "如何用Redisson实现分布式锁？": {
+    "oral": "Redisson 内部封装了成熟的分布式锁逻辑。调用 `rLock.lock()` 时，底层会执行一段 Lua 脚本以原子方式执行 `HSET` 记录锁持有者线程 UUID 与重入计数器，并设置默认 30 秒超时时间；同时 Redisson 会在后台启动一个「看门狗（Watchdog）」定时任务，每隔 10 秒（内建 leaseTime / 3）自动续期锁的生存时间，直到业务处理完成显式调用 `unlock()` 为止，完美避免了业务未执行完锁被意外提前释放的问题。",
+    "reason": "- 核心机制：\n  1. 互斥性：基于 Redis 哈希结构与 Lua 脚本原子判断；\n  2. 可重入性：基于 Hash key 记录持有者和调用深度自增/自减计数；\n  3. 自动续期防死锁：看门狗守护线程自动续约，若服务宕机看门狗停止，30 秒后 Redis 自动过期释放锁；\n  4. 阻塞等待：基于 Redis Pub/Sub 订阅锁释放通知，被动唤醒后继续自旋尝试获取，避免盲目轮询拉高 CPU。",
+    "pit": "如果业务显式传入了超时间隔 `lock(10, TimeUnit.SECONDS)`，Redisson 将不会启动看门狗机制，到期必定强制释放！因此长耗时任务切勿手动写死超时时长。"
+  },
+  "Kafka如何保证消息不丢失？": {
+    "oral": "保证消息不丢必须从「生产者、Broker 服务端、消费者」三个环节协同保障：\n1. 生产者端：设置 `acks=all`（-1），确保所有 ISR 副本全部同步确认；配置重试次数 `retries` 并使用带回调的异步发送方法。\n2. Broker 端：设置每个分区至少 2~3 个副本，配置 `min.insync.replicas >= 2`，且严禁开启非 ISR 副本参与选举竞选 Leader（`unclean.leader.election.enable=false`）。\n3. 消费者端：关闭自动提交位移（`enable.auto.commit=false`），必须在业务消息真正成功处理完成后，再手动提交 Offset（同步或异步提交）。",
+    "reason": "- 机制保障：通过 ISR 动态同步集合配合高水位（HW, High Watermark）机制，保证只有所有追随者都落盘的消息才能被对外消费。\n- 生产端幂等性：开启 `enable.idempotence=true`，Kafka 会为每个 Producer 分配 PID 并为每条消息记录 Sequence Number，服务端自动去重，杜绝网络超时重试带来的数据重复。",
+    "pit": "如果消费端为了追求吞吐量将处理逻辑丢给线程池异步执行，而主线程立刻提交了 Offset，一旦子线程执行失败发生异常崩溃，该消息将永久丢失。"
+  },
+  "如何确保Kafka中的消息顺序性？": {
+    "oral": "Kafka 只能保证「单个分区（Partition）内部的消息局部有序」，无法保证跨分区的全局顺序。要确保严格顺序消费，生产者必须使用相同的 Key（如订单号 order_id）发往同一个目标分区，并且每个分区仅由同一个消费组内的唯一一个消费者单线程按顺序拉取并处理。",
+    "reason": "- 生产端配置：当发生重试时，如果允许最大并发请求数大于 1，后发的消息可能先成功。因此必须开启幂等性，并将生产端 `max.in.flight.requests.per.connection` 设置为 1（或开幂等时 <= 5），防止重试错位。\n- 消费端处理：消费端绝对不能将单个分区的消息随意抛入并发线程池无序并行处理，如果需要并发提高吞吐量，必须在内存中按照业务 Key 再次做二次内存哈希路由（分发给固定子线程串行处理）。",
+    "pit": "业务若强求全局顺序，只能把 Topic 的分区数硬性设置为 1，但这会直接掐死 Kafka 的并发吞吐能力，通常应尽量从业务模型设计上拆解为按用户/订单维度的局部保序。"
+  },
+  "作为服务注册中心，Nacos和Eureka的区别是什么？": {
+    "oral": "主要区别在一致性模型、心跳健康检查机制与生态集成上。Eureka 仅支持 AP 模式，依赖定时心跳与自我保护机制维持可用；Nacos 同时支持 AP 和 CP 两种模式（对临时实例默认采用 AP 模式通过 UDP 轻量心跳推拉，对持久实例采用 CP 模式基于 Raft 协议强一致落盘），并且 Nacos 原生自带配置中心与动态刷新能力，功能更加全面。",
+    "reason": "- 架构演进：Eureka 2.x 开源闭源后停更，社区逐渐转向 Nacos 与 Consul。\n- 变更推送：Eureka 客户端依靠定时轮询拉取变更（有长达 30 秒感知延迟）；Nacos 实现了长轮询机制与 UDP 主动推送，配置和服务实例变更秒级触达。",
+    "pit": "如果系统中需要强一致性的持久化元数据管理，必须配置 Nacos 的持久化集群模式；但在绝大多数微服务调用注册场景下，优先保持 AP 模式以确保服务调用的高可用性。"
+  },
+  "对比区分服务熔断和降级": {
+    "oral": "熔断侧重于「防止系统雪崩与自愈保护」，降级侧重于「在资源紧张时丢车保帅保证核心可用」。熔断是当下游服务响应超时或异常比例超阈值时，自动切断调用链路（类似保险丝跳闸），在设定的休眠窗口期内直接快速失败；降级则是主动或被动的兜底策略，当服务出现异常或大促峰值时，返回默认友好提示、旧缓存或空数据，优先保证主链路顺畅。",
+    "reason": "- 状态机关系：熔断器通常具备 Closed（闭合正常）、Open（打开熔断拒绝请求）、Half-Open（半开探测部分流量探活恢复）三种状态。\n- 触发时机：降级可在系统流量超出承载能力时人工开关触发（如双十一屏蔽发票开具），也可作为熔断发生后的 Fallback 兜底实现。",
+    "pit": "降级逻辑必须极简且极度稳定，绝对不能在降级方法内部又去调用可能发生阻塞的外部 RPC 接口或慢 SQL。"
+  },
+  "RabbitMQ如何确保消息发送？消息接收？": {
+    "oral": "确保消息不丢失贯穿三个阶段：\n1. 发送到 Exchange：开启生产者确认机制（`publisher-confirm`），Broker 收到后异步返回 ACK/NACK；\n2. 从 Exchange 路由到 Queue：开启投递返回机制（`publisher-returns`），路由失败时回调返回消息；\n3. Broker 自身持久化：Queue 设置为 durable，Message 设置为 PERSISTENT 模式；\n4. 消费接收端：关闭自动 ACK（`acknowledge-mode=manual`），必须在业务代码真正执行无误后才手动执行 `basicAck`，若异常则调用 `basicNack`/`basicReject` 并配置死信队列。",
+    "reason": "- 性能平衡：异步 Confirm 回调性能最高，避免同步等待堵塞吞吐量。\n- 镜像队列/Quorum 队列：单机持久化仍防不住物理机断电，生产必须配置 Quorum 队列（基于 Raft 协议的高可用仲裁队列）。",
+    "pit": "严禁直接在收到消息的瞬间就自动 ACK，否则只要业务处理报错或者进程被 kill，消息将在未完成实际业务的情况下永久丢失。"
+  },
+  "有几百万的消息持续积压几小时，这种情况如何解决？": {
+    "oral": "生产海量消息积压标准应急四步走：\n1. 紧急修复消费者 Bug：立刻排查消费者卡死、慢 SQL 或依赖服务异常，恢复消费能力；\n2. 紧急临时扩容消费者：若因吞吐不足积压，停掉现有消费端，上线临时紧急分发程序，将积压队列的消息以几十倍并发直接轮询转发写入到新建的 10~20 个临时 Queue 中；\n3. 启动数十倍临时消费节点：每个临时 Queue 部署专门的消费者节点无脑并行消费，快速在短时间内削平积压峰值；\n4. 恢复原状：积压清理完毕后，恢复原本的架构设计与服务规模。",
+    "reason": "- 过期失效消息处理：若消息设置了 TTL 导致积压超时被丢弃，应在低峰期写批量查询脚本从数据库或操作日志重放补发数据。\n- 队列打满风险：若队列已占满物理磁盘，应急程序必须只做日志落盘或写入冷存储，先保住消息不丢，事后再写离线批处理脚本逐步消费。",
+    "pit": "积压期间切忌盲目扩大单个消费者的线程池，如果不排查下游数据库的承受能力，过度扩容会直接将后端核心数据库瞬间打垮挂死。"
+  },
+  "overload和override的区别": {
+    "oral": "核心区别在「发生范围和绑定时机」：Overload（重载）发生在同一个类中，方法名相同但参数列表不同，属于编译期静态多分派；Override（重写）发生在子类和父类之间，子类覆盖父类的同名同参方法，属于运行期动态单分派（多态）。",
+    "reason": "- 重写遵循「两同两小一大」原则：方法名和参数列表相同；子类返回值类型小于等于父类，抛出异常类型小于等于父类；子类访问修饰符大于等于父类（如 protected 可扩大为 public）。\n- 限制：私有方法（private）、静态方法（static）、final 方法都不能被重写。",
+    "pit": "子类如果定义了与父类一模一样的静态方法，这叫「方法隐藏（Method Hiding）」而不是重写，静态方法不会产生多态效果。"
+  },
+  "final和finally的区别": {
+    "oral": "final 是关键字修饰符，修饰类表示不可继承，修饰方法表示不可重写，修饰变量表示引用不可变；finally 是异常处理机制的代码块，紧随 try 或 catch 之后，无论是否发生异常，finally 块中的代码通常都必定执行，常用于释放数据库连接、IO 等底层资源。",
+    "reason": "- final 内存语义：JMM 中 final 域的读写有着特殊的内存屏障保护，能保证对象安全发布，构造函数中对 final 变量的写入不会被重排序到对象引用暴露之后。\n- finally 不执行的极端特例：在进入 finally 之前执行了 `System.exit(0)`，或者操作系统断电、虚拟机 Crash、线程被直接杀死。",
+    "pit": "千万不要在 finally 块中书写 `return` 语句！finally 中的 return 会直接覆盖并吞掉 try 块中的 return 返回值或未抛出的异常，造成隐蔽 Bug。"
+  },
+  "this和super都能用到哪些地方？": {
+    "oral": "this 指代「当前对象本身的引用」，super 指代「当前对象所继承的直接父类特征」。它们主要用于三种场景：1. 访问成员变量区分同名字段；2. 调用本类或父类的一般成员方法；3. 在构造函数首行互相调用（`this(...)` 调用本类重载构造器，`super(...)` 调用父类构造器）。",
+    "reason": "- 构造器约定：在构造函数中，`this(...)` 和 `super(...)` 必须位于第一行，因此两者不能在同一个构造函数中共存；若子类构造器未显式调用，编译器会默认插入隐式的 `super()`。\n- 静态上下文限制：静态方法和静态代码块属于类本身，在对象初始化前就存在，因此静态上下文中严禁使用 this 和 super。",
+    "pit": "笔试中常考父子类构造函数执行链：创建子类对象时必定先递归触发父类构造方法初始化，父类变量初始化先行完毕后才执行子类构造体。"
+  },
+  "接口与抽象类的区别": {
+    "oral": "核心区别在「设计目的与语法约束」：接口是对「行为能力」的抽象，体现的是 `can-do` 契约关系；抽象类是对「类本质」的抽象，体现的是 `is-a` 的继承血缘关系。一个类可以实现多个接口，但只能单继承一个抽象类。",
+    "reason": "- 语法差异：\n  1. 变量：接口字段默认且只能是 `public static final` 全局常量；抽象类可以拥有各种修饰符的普通成员变量。\n  2. 方法：JDK 8 之前接口只有纯抽象方法，JDK 8 开始支持 default 默认方法和 static 静态方法，JDK 9 支持 private 私有方法；抽象类可以随意拥有构造器、抽象方法与非抽象方法。\n  3. 构造器：抽象类有构造器供子类调用，接口绝对没有构造器。",
+    "pit": "设计模式中的抽象工厂、模板方法模式必须依赖抽象类落地；而面向接口编程（解耦、多实现）首选接口。"
+  },
+  "静态变量与实例变量的区别": {
+    "oral": "静态变量（类变量）使用 static 修饰，属于类级别，由所有实例共享，随类加载初始化并常驻方法区/元空间；实例变量不带 static，属于具体对象实例级别，每个对象各有一份独立内存，存在堆内存中，随对象的创建而分配、随对象垃圾回收而释放。",
+    "reason": "- 访问方式：静态变量可直接通过 `类名.变量名` 访问，实例变量必须先 new 出实例后通过引用访问。\n- 线程安全：静态变量由于全类全线程共享，在多线程并发修改时天然存在线程安全隐患，必须加同步锁控制；实例变量只要不跨线程共享通常相对局限。",
+    "pit": "千万不要在 Spring 单例 Bean 中随意声明有状态的静态变量或非 final 实例成员，这极易引发跨请求的并发数据污染。"
+  },
+  "throw和throws 的区别": {
+    "oral": "throw 位于方法体内部，用于「显式抛出一个具体的异常实例」；throws 位于方法签名声明尾部，用于「声明该方法可能会抛出哪些异常类型」，告知调用方必须在代码中显式处理（try-catch）或继续向外抛出。",
+    "reason": "- throw 后面只能跟一个异常对象（如 `throw new IllegalArgumentException(...)`），执行到 throw 语句方法立即中断返回；\n- throws 后面可以跟多个异常类名（用逗号隔开），是一种对外的契约式声明，主导编译器对受检异常（Checked Exception）的合规性检查。",
+    "pit": "运行期异常（RuntimeException）无需在 throws 中强制声明，但受检异常（如 IOException）若不声明也不捕获，编译器将直接报错。"
+  },
+  "包装类拆箱装箱": {
+    "oral": "装箱是把基本数据类型转换成对应的包装类对象（底层调用 `valueOf` 方法，如 `Integer.valueOf(i)`）；拆箱是把包装类对象转换成基本数据类型（底层调用 `xxxValue` 方法，如 `i.intValue()`）。Java 5 之后编译器支持自动拆装箱语法糖。",
+    "reason": "- 常量池缓存：Byte, Short, Integer, Long 默认缓存了 `[-128, 127]` 范围内的对象，Character 缓存了 `[0, 127]`。在此范围内 `Integer.valueOf()` 返回的是同一个内存缓存对象，超出范围则会 `new` 新对象。\n- 性能开销：在循环体内部进行自动装箱会产生大量无用的短命包装对象，造成轻微 GC 压力。",
+    "pit": "自动拆箱极易引发生产环境空指针异常（NPE）！当一个为 null 的包装类对象与基本类型比较（`intVal == integerObj`）或被三目运算符触发拆箱时，JVM 自动调用 `intValue()` 会直接抛出 NullPointerException。"
+  },
+  "异常结构图": {
+    "oral": "Java 异常体系根节点是 `Throwable`，其下主要分两大子类：`Error` 和 `Exception`。\n- Error：JVM 严重的底层错误，程序自身无法恢复（如 OutOfMemoryError, StackOverflowError）；\n- Exception：程序本身可以捕获并处理的异常，又分为「受检异常（Checked Exception）」和「非受检运行时异常（Unchecked / RuntimeException）」。",
+    "reason": "- RuntimeException（运行时异常）：如 NullPointerException, IndexOutOfBoundsException, ClassCastException，通常源自代码逻辑缺陷，编译器不强制 try-catch。\n- Checked Exception（受检异常）：如 IOException, SQLException, ClassNotFoundException，必须显式在方法体处理或方法签名中 throws 声明，否则编译无法通过。",
+    "pit": "在 Spring 事务中，默认只有抛出 `RuntimeException` 或 `Error` 事务才会自动回滚；若抛出受检异常（Checked Exception）默认是不回滚的，必须配置 `@Transactional(rollbackFor = Exception.class)`。"
+  },
+  "请谈一下Java中I/O技术体系中包含哪些种类的流？": {
+    "oral": "Java I/O 体系按处理数据的最小单元分为「字节流（以 Stream 结尾）」和「字符流（以 Reader / Writer 结尾）」；按流向分为「输入流」和「输出流」；按功能层次分为「节点流（直接连接物理数据源）」和「包装/处理流（基于装饰器模式提供缓冲、转换、对象序列化增强）」。",
+    "reason": "- 四大抽象基类：`InputStream`, `OutputStream`（字节）；`Reader`, `Writer`（字符，底层带 Unicode 字符集解码）。\n- 常用缓冲与转换流：`BufferedInputStream` / `BufferedReader`（提供内存缓冲区减少物理系统调用开销）；`InputStreamReader`（字节流转字符流的桥梁）。\n- I/O 模型进阶：除了传统的 BIO（阻塞IO），Java 提供了 NIO（基于 Channel、Buffer、Selector 的多路复用非阻塞IO）和 AIO（基于回调的异步IO）。",
+    "pit": "操作所有 IO 流必须在 `try-with-resources` 语法块中打开，以确保底层文件句柄和 Socket 描述符在异常退出时能可靠自动关闭，防止操作系统文件句柄泄漏。"
+  },
+  "请谈谈你对反射的理解": {
+    "oral": "反射（Reflection）是指在程序的运行状态中，对于任意一个类，都能够知道这个类的所有属性和方法；对于任意一个对象，都能够动态调用它的任意方法和属性。反射是各种主流开源框架（如 Spring IoC/AOP、MyBatis、Hibernate、Dubbo）的底层基石。",
+    "reason": "- 核心 API：`Class`, `Constructor`, `Method`, `Field`。\n- 框架应用：Spring 通过反射读取 BeanDefinition 动态调用构造器实例化 Bean，通过 `Field.setAccessible(true)` 强行打破私有修饰符完成属性依赖注入。\n- 优缺点：优点是极高扩展性与动态灵活性；缺点是性能略有损耗（缺少 JIT 深度内联优化）、打破了类的封装性、代码可读性较差。",
+    "pit": "高频核心业务热点路径上若频繁调用反射，需缓存 `Method` / `Constructor` 实例或采用字节码增强（CGLIB/ByteBuddy/MethodHandle）提升性能。"
+  },
+  "List和Map区别?": {
+    "oral": "核心区别在「数据结构和元素组织方式」：List 属于 `Collection` 单列集合，存储元素是有序的、可以通过整型索引下标精准访问、且允许存放重复元素；Map 是独立的双列键值对映射集合，以 `Key-Value` 形式存储，Key 唯一不重复，Value 可以重复，且不保证整体有序（TreeMap/LinkedHashMap 除外）。",
+    "reason": "- 继承体系：List 继承自 `Collection` 接口；Map 是顶层独立接口，两者接口设计理念完全不同。\n- 常见实现：List 常见有 `ArrayList`（数组）、`LinkedList`（双向链表）；Map 常见有 `HashMap`（哈希表）、`TreeMap`（红黑树按 Key 排序）、`ConcurrentHashMap`（并发安全哈希表）。",
+    "pit": "Map 没有迭代器 iterator 方法，必须通过 `keySet()`、`entrySet()` 或 `values()` 转换为 Collection 视图才能遍历。"
+  },
+  "List、Map、Set三个接口，存取元素时，各有什么特点?": {
+    "oral": "三个接口存取特点可归纳为：\n- List：有序、可重复、支持按下标整数索引随机存取；\n- Set：元素唯一不重复、无序（HashSet 不保序，LinkedHashSet 依插入顺序，TreeSet 依排序规则），只能通过迭代器或 foreach 取值；\n- Map：双列键值对（Key-Value）存取，Key 唯一无序、Value 可重复，基于 Key 进行 Hash 运算实现近 O(1) 的高效寻址。",
+    "reason": "- Set 的本质：`HashSet` 底层直接包装并复用了一个 `HashMap`，把放入 Set 的元素作为 HashMap 的 Key，所有 Value 统一填充同一个静态虚拟常量 `new Object()`。\n- 复杂度对比：List 下标随机访问 O(1)，按值查找 O(n)；Set/Map 基于散列寻址在均匀分布下增删改查均为 O(1)。",
+    "pit": "往 Set 或 Map Key 存入自定义对象时，若对象内容会被外部修改从而影响 hashCode() 计算，之后将再也无法通过原对象查找到对应数据。"
+  },
+  "HashSet的去重原理": {
+    "oral": "HashSet 底层是基于 HashMap 实现的。向 HashSet 添加元素 `e` 时，实质上调用的是 `map.put(e, PRESENT)`。去重完全依赖该元素所属类所重写的 `hashCode()` 与 `equals()` 方法：先根据 hash 计算桶下标，只有当两个对象 hash 相等且通过 `==` 或 `equals()` 判定也为 true 时才认为是重复元素，新值放弃覆盖，从而保证集合元素唯一。",
+    "reason": "- 两阶段判断：\n  1. 第一阶段：先比较两者的 `hash` 值，若 hash 不同，必定不是同一个对象，直接存入；\n  2. 第二阶段：若 hash 发生碰撞，再调用 `equals()` 深度比较字段内容。只有两者都相等才判定重复。\n- 效率保障：利用 hash 值的快速预判，避免了每次插入都要对全集合逐个执行耗时的 equals 遍历比较。",
+    "pit": "若自定义实体类没有重写 hashCode 和 equals，两个字段完全一致的对象会被 HashSet 误判为不同对象同时存入，导致去重功能彻底失效！"
+  },
+  "HashMap与HashTable 的区别": {
+    "oral": "核心有四点区别：\n1. 线程安全：HashMap 是非线程安全的；HashTable 所有核心读写方法都加了 `synchronized`，是线程安全的，但并发性能极差（已被 ConcurrentHashMap 淘汰）；\n2. null 支持：HashMap 允许一个 key 为 null，多个 value 为 null；HashTable 严禁 key 和 value 为 null（会报 NPE）；\n3. 底层结构与扩容：HashMap 采用「数组+链表+红黑树」，默认容量 16，扩容为 2 倍；HashTable 是传统的「数组+链表」，默认容量 11，扩容为 `2n + 1`；\n4. 继承历史：HashMap 继承自 AbstractMap；HashTable 继承自陈旧古董类 Dictionary。",
+    "reason": "- 寻址算法：HashMap 强制容量为 2 的幂次方，使用位运算 `hash & (n - 1)` 取模；HashTable 使用取模运算 `% table.length`，性能较慢。\n- 生产规范：单线程使用 `HashMap`，多线程并发环境唯一推荐 `ConcurrentHashMap`，严禁在生产新项目中再使用 HashTable。",
+    "pit": "多线程环境下千万不要以为用 Collections.synchronizedMap(hashMap) 就万事大吉，它本质也是全局排他锁，并发高时吞吐量与 HashTable 一样糟糕。"
+  },
+  "JDK7与JDK8中HashMap的不同点？": {
+    "oral": "从 JDK 7 到 JDK 8，HashMap 有五大核心重构：\n1. 数据结构：7 是纯「数组 + 单向链表」，8 引入了「红黑树」（链表长度>=8且容量>=64转红黑树）；\n2. 链表插入方式：7 采用「头插法」，8 改用「尾插法」；\n3. 扩容并发死循环：7 在并发扩容重哈希时由于头插法会引发链表成环导致 CPU 100% 死循环，8 改用尾插法彻底消除了链表死循环死锁；\n4. 寻址与扩容计算：8 优化了 hash 扰动函数（由 4 次位移减少到 1 次），扩容时节点无需重算 hash，依靠 `(e.hash & oldCap) == 0` 判断留在原位还是高位；\n5. 结构对象初始化：7 在 new 时直接分配数组，8 改为第一次 put 时懒加载初始化数组。",
+    "reason": "- 为什么消除死循环后还是线程不安全？虽然 JDK 8 杜绝了环形链表死循环，但在并发无锁写入时仍会发生节点被并发覆盖（数据丢失）或 size 计数不一致。",
+    "pit": "面试官连环追问：“为什么 JDK 7 选头插法？”因为设计者最初假设新插入的数据被访问的概率更高（时间局部性原则），但带来了严重并发倒序成环风险。"
+  },
+  "MySQL事务的基本特性和隔离级别": {
+    "oral": "MySQL 事务具有 ACID 四大特性：原子性（Atomicity）、一致性（Consistency，核心目的）、隔离性（Isolation）、持久性（Durability）。\n对应四大隔离级别：\n1. 读未提交（Read Uncommitted）：可能脏读、不可重复读、幻读；\n2. 读已提交（Read Committed）：解决脏读，仍有不可重复读和幻读；\n3. 可重复读（Repeatable Read，MySQL 默认）：解决脏读和不可重复读，配合间隙锁基本解决幻读；\n4. 串行化（Serializable）：强制排他加锁，彻底杜绝所有并发问题但吞吐量极低。",
+    "reason": "- 底层支持：ACID 中，A 由 Undo Log 保证，D 由 Redo Log 保证，I 由锁机制（Lock）和 MVCC 读视图保证，C 是一致性状态的终极目标。\n- 隔离级别选型：互联网很多大厂生产环境会将 MySQL 隔离级别调整为「Read Committed（读已提交）」，因为 RC 锁粒度更轻（没有 Gap Lock 间隙锁），死锁概率大大降低，性能更佳。",
+    "pit": "在 RC 隔离级别下，主从同步的 Binlog 格式必须配置为 `ROW` 模式，如果配置为 STATEMENT 模式会导致主从数据不一致。"
+  },
+  "MySQL中ACID靠什么保证的？": {
+    "oral": "ACID 的底层保障体系各司其职：\n- A（原子性）：靠 Undo Log（回滚日志）保证。事务发生错误或回滚时，通过 Undo Log 反向执行相反操作恢复原状；\n- D（持久性）：靠 Redo Log（重做日志）保证。事务提交前只要把修改的物理日志顺序追加刷入 Redo Log，即使服务器断电宕机，重启后依据 Redo Log 重放崩溃恢复（WAL 技术）；\n- I（隔离性）：靠 锁机制（行锁、表锁、间隙锁）配合 MVCC（多版本并发控制 Read View）保证；\n- C（一致性）：一致性是事务的最终目的，依赖 A、I、D 三者协同保障以及业务层逻辑约束。",
+    "reason": "- WAL（Write-Ahead Logging）：先写日志再写磁盘数据页。将随机磁盘 IO 转为极快的顺序 IO，保障高效持久化。\n- 二阶段提交：在写入 Redo Log 和 Binlog 时采用两阶段提交协议（Prepare -> 写 Binlog -> Commit），保证主库物理日志与从库逻辑 Binlog 的绝对一致。",
+    "pit": "如果数据库没有开启双一配置（`innodb_flush_log_at_trx_commit=1` 和 `sync_binlog=1`），在物理服务器突然掉电时依然有丢失微量事务数据的风险。"
+  },
+  "InnoDB和MyISAM中索引的区别": {
+    "oral": "核心区别在「索引与数据文件的组织关系」：InnoDB 的主键索引是「聚簇索引」，叶子节点直接存放了完整的整行物理数据，辅助索引叶子节点存放的是主键值；而 MyISAM 的索引是「非聚簇索引」，索引文件（.MYI）和数据文件（.MYD）彻底分离，叶子节点存储的仅仅是指向数据文件物理地址的指针。",
+    "reason": "- 回表查询区别：InnoDB 二级索引查询非索引字段时，需要先查出主键，再回聚簇索引树查整行（回表）；MyISAM 不管主键索引还是辅助索引，叶子节点全部直接存储物理地址，寻址逻辑一致。\n- 事务与锁：InnoDB 支持事务和细粒度行级锁，适合高频并发写；MyISAM 不支持事务，只有表级锁，写操作会直接锁整表，但支持空间压缩和全文索引（旧版）。",
+    "pit": "因为 InnoDB 严格依主键顺序物理聚簇存放数据，建表时务必显式声明自增主键，若使用随机 UUID 作主键会引发频繁严重的 B+ 树页分裂（Page Split）和性能劣化。"
+  },
+  "MySQL中B+树和B树的区别": {
+    "oral": "主要有三点核心区别：\n1. 数据存储位置：B 树的每个节点（无论是根节点、内部节点还是叶子节点）都存储实际的数据记录；B+ 树只有叶子节点才存储真实数据，非叶子节点只存储索引 Key 和指针；\n2. 范围查询与遍历：B+ 树的所有叶子节点通过双向链表首尾相连，范围扫描 `BETWEEN AND` 顺着链表直接向后遍历即可；B 树范围查询必须对整棵树做复杂的中序遍历；\n3. 树的高度与 I/O 效率：B+ 树非叶子节点不存行数据，单个 16KB 数据页可以容纳更多 Key，树更矮胖（通常 3 层就能承载 2000 万数据），查询所需的磁盘 I/O 次数更少且稳定。",
+    "reason": "- 磁盘局部性：InnoDB 默认一页为 16KB，B+ 树一个非叶子节点可存约 1000 多个指针，3 层的 B+ 树就能索引 `1000 * 1000 * 20 = 2000万` 行数据，根节点常驻内存，实际查询通常只需要 1~2 次随机磁盘 I/O。",
+    "pit": "面试官连环追问：“为什么不选哈希索引？”哈希虽然单条等值查询是 O(1)，但哈希索引无法利用最左匹配、不支持任何范围查询、也不支持排序。"
+  },
+  "MySQL索引的设计原则": {
+    "oral": "生产索引设计需遵守以下黄金法则：\n1. 选择高区分度（基数大）的列建立索引，区分度公式 `count(distinct col)/count(*)` 越接近 1 越好；\n2. 联合索引严格遵循「最左前缀原则」，将过滤性最强、查询最高频的列放最左侧；\n3. 尽量利用「覆盖索引」，让索引树直接包含查询字段，避免回表 I/O；\n4. 避免在低区分度列（如性别、状态位）单独建索引；\n5. 控制单表索引总量（通常不超过 5~6 个），过多的索引会严重拖慢 insert/update 的性能；\n6. 避免在索引列上做函数运算、类型强转或模糊查询以 `%` 开头，否则会导致索引失效。",
+    "reason": "- 联合索引匹配顺序：查询条件从最左列开始连续匹配，一旦遇到范围查询（`<`、`>`、`between`、`like`），其右侧列索引失效（可用覆盖索引或 MySQL 5.6 索引下推 ICP 优化）。",
+    "pit": "字符串字段建索引必须指定前缀长度（前缀索引），避免大文本占满整页导致索引树层数激增。"
+  },
+  "关心过业务系统里面的SQL耗时吗？统计过慢查询吗？对慢查询都怎么优化过？": {
+    "oral": "实际排查优化四步走：\n1. 捕获慢查询：开启 MySQL 慢查询日志（`slow_query_log=1`，设置 `long_query_time=1` 秒），通过 `mysqldumpslow` 汇总分析；\n2. 分析执行计划：使用 `EXPLAIN` 查看 SQL 执行计划，重点关注 `type`（是否达到 ref/range 以上）、`rows`（预估扫描行数）以及 `Extra`（是否出现 Using filesort、Using temporary）；\n3. 索引优化：建立或调整联合索引以命中覆盖索引、修复由于隐式类型转换或函数计算引发的索引失效；\n4. 架构与 SQL 重写：大分页优化（利用子查询走延迟关联 `join` 延迟回表）、多表关联小表驱动大表、深层热点数据上 Redis 缓存削峰。",
+    "reason": "- 经典深度分页优化：`select * from table where ... limit 1000000, 20` 改写为 `select * from table t1 join (select id from table where ... limit 1000000, 20) t2 on t1.id = t2.id`，大幅规避 100 万行数据的无谓回表消耗。",
+    "pit": "千万不要直接在线上大表执行 `ALTER TABLE ADD INDEX`！必须使用 pt-online-schema-change 或 gh-ost 等无锁变更工具，否则会造成长时间锁表引发全线服务宕机。"
+  },
+  "MySQL执行计划怎么看": {
+    "oral": "看 `EXPLAIN` 关键抓住核心四列：\n1. `type`（访问类型）：性能从好到差依次为 `system > const > eq_ref > ref > range > index > ALL`。生产环境至少要达到 `range` 或 `ref` 级别，出现 `ALL`（全表扫描）通常必须优化；\n2. `key`：实际命中的索引名称，`possible_keys` 是候选索引；\n3. `rows`：InnoDB 估算必须扫描的行数，越少越好；\n4. `Extra`：额外重要信息。若出现 `Using index`（覆盖索引，无需回表）是极佳状态；若出现 `Using filesort`（内存/磁盘外部排序）或 `Using temporary`（建立临时表）则是高危性能瓶颈，需建立合适索引消除。",
+    "reason": "- `key_len`：索引使用的字节数，可用于精准判断联合索引中到底生效了几个字段。\n- `Using index condition`：表示用到了 MySQL 5.6 索引下推（ICP）技术，在存储引擎层先过滤数据，大幅减少回表次数。",
+    "pit": "千万注意：执行计划中的 `rows` 只是依据统计信息预估的值，并不完全等同于实际扫描行数，如需看最真实物理消耗可结合 `explain analyze`。"
+  },
+  "什么是 Spring IOC 容器？": {
+    "oral": "Spring IoC（控制反转）容器本质是一个大型的组件对象生命周期管理器。原本在业务代码中由开发者主动 `new` 创建对象并维护依赖关系的控制权，反转交给由 Spring 容器统一负责 Bean 的定义解析、反射实例化、属性依赖注入（DI）、AOP 代理以及生命周期托管，从而实现软件架构的高内聚、松耦合与高可测性。",
+    "reason": "- 核心载体：底层的 `DefaultListableBeanFactory` 维护着 `beanDefinitionMap`（存放配置元信息字典）和 `singletonObjects`（一级单例缓存池）。\n- 运行链路：读取 Resource 配置资源 -> BeanDefinitionReader 解析注册元信息 -> 容器扩展点（BeanFactoryPostProcessor）修改配置 -> 实例化 Bean 注入属性 -> BeanPostProcessor 增强拓展（如 AOP 代理）。",
+    "pit": "IoC 容器默认管理的 Bean 都是单例的（Singleton），这意味着单例 Bean 内部应尽量保持无状态，否则多线程并发调用共享字段会出现数据覆盖风险。"
+  },
+  "BeanFactory 和 ApplicationContext的区别？": {
+    "oral": "BeanFactory 是 Spring 框架的基础顶层根接口，提供最纯粹的 IoC 依赖注入功能，采用「懒加载」策略（只有第一次 `getBean()` 时才实例化对象）；ApplicationContext 是 BeanFactory 的子接口，定位是「面向企业级应用的高级容器」，默认采用「预加载」策略（容器启动完成时就预先初始化全部单例 Bean），并且整合了 AOP、国际化（MessageSource）、事件发布监听机制和资源加载器（ResourceLoader）。",
+    "reason": "- 生产选型：现代实际开发 100% 使用 `ApplicationContext`（如 AnnotationConfigApplicationContext、SpringBoot 的 ServletWebServerApplicationContext）。预加载虽然在启动时耗时稍长，但能确保在项目启动阶段就把依赖错误暴露出来，避免运行时抛异常。",
+    "pit": "由于 ApplicationContext 继承了 ListableBeanFactory 和 HierarchicalBeanFactory，容器具有父子层次关系，子容器可以访问父容器中的 Bean，但父容器无法访问子容器的 Bean（Spring MVC 与 Spring 根容器隔离模型）。"
+  },
+  "Spring 中的 bean 的作用域有哪些?": {
+    "oral": "Spring 支持五大作用域：\n1. singleton（单例，默认）：整个 Spring IoC 容器中只有唯一一个共享实例；\n2. prototype（原型）：每次请求 `getBean()` 都会重新 new 一个全新的对象实例；\n3. Web 环境独有三大作用域：\n   - request：每次 HTTP 请求创建一个全新 Bean，请求结束销毁；\n   - session：每个 HTTP Session 会话共享一个 Bean；\n   - application：整个 ServletContext 生命周期内共享单例。",
+    "reason": "- 销毁回调差异：Spring 负责 singleton 单例 Bean 的完整生命周期（包括创建和 destroy 销毁）；但对于 prototype 原型 Bean，Spring 在创建并依赖注入完成后就将其交给使用者，容器不再负责其销毁流程，需开发者自己手动清理资源。",
+    "pit": "单例 Bean 注入原型 Bean 的陷阱：如果把一个 prototype Bean 注入到 singleton Bean 中，该原型 Bean 只会在单例初始化时被注入一次，后续请求调用它其实并不会动态更新！解决办法是改用 `@Lookup` 注解或 `ObjectProvider` 延迟获取。"
+  },
+  "AOP 有哪些实现方式？": {
+    "oral": "Spring AOP 底层主要有两种动态代理实现方式：\n1. JDK 动态代理：基于 Java 原生 `java.lang.reflect.Proxy`，目标类「必须实现至少一个业务接口」，代理类通过实现相同接口并在 InvocationHandler 中拦截方法调用；\n2. CGLIB 动态代理：基于开源字节码类库 ASM，通过「动态生成目标类的子类」并重写父类方法实现代理拦截，目标类无需实现任何接口。",
+    "reason": "- 选型策略：Spring 传统模式下有接口优先使用 JDK 动态代理，无接口使用 CGLIB；Spring Boot 2.x 开始将 `spring.aop.proxy-target-class` 默认设为 true，全面统一默认使用 CGLIB 代理。\n- 限制约束：CGLIB 依赖继承，因此目标类或目标方法如果被 `final` 修饰则无法生成代理；私有方法（private）任何代理机制都无法拦截增强。",
+    "pit": "内部方法自调用（Self-Invocation）大坑：在类内部通过 `this.methodB()` 调用本类带 `@Transactional` 或 `@Async` 的方法时，由于绕过了代理对象直接调用目标类本身，AOP 切面增强将彻底失效！"
+  },
+  "Spring事务什么时候会失效": {
+    "oral": "高频八大事务失效场景：\n1. 内部方法自调用：同类中未走代理对象，直接通过 `this.method()` 调用事务方法；\n2. 方法访问修饰符非 public：底层拦截器默认只对 public 方法进行事务增强；\n3. 异常被自行 try-catch 吞掉：业务代码自己把异常捕获了且没有重新向外抛出，事务切面感知不到异常判定成功并提交；\n4. 抛出非受检异常以外的 Checked 异常：`@Transactional` 默认只回滚 RuntimeException 和 Error，若抛出 Exception 默认不回滚（必须加 `rollbackFor = Exception.class`）；\n5. 数据库引擎不支持事务：如底层用了 MyISAM 表引擎；\n6. 声明类没有被 Spring IoC 托管（没加 `@Service` 注解）；\n7. 事务传播机制配置为非事务型（如 `NOT_SUPPORTED` / `NEVER`）；\n8. 多线程异步调用：事务上下文基于 ThreadLocal 存储，新线程无法共享父线程事务。",
+    "reason": "- 内部调用解决策略：\n  1. 注入自身代理对象；\n  2. 使用 `AopContext.currentProxy()` 强转为当前代理后调用；\n  3. 将内部方法抽取拆分到新的独立的 Service 类中。",
+    "pit": "生产环境严禁省略 `rollbackFor`，所有声明式事务注解务必显式写成 `@Transactional(rollbackFor = Exception.class)`。"
+  },
+  "@RestController 和 @Controller 有什么区别？": {
+    "oral": "@RestController 是一个复合注解，它等价于 `@Controller` + `@ResponseBody`。\n- `@Controller` 配合传统 MVC 视图解析器（如 Thymeleaf、JSP）使用，方法返回值通常代表视图名称（View Name），经视图解析器渲染为 HTML 页面；\n- `@RestController` 是为 RESTful API 打造的，类中所有方法的返回值都会通过 `HttpMessageConverter`（如 Jackson）直接序列化为 JSON 或 XML 字符串直接写入 HTTP Response Body，不走任何视图跳转。",
+    "reason": "- 现代微服务开发：前后端分离架构下 99% 的后端 Controller 均使用 `@RestController` 提供纯数据接口。\n- 混合使用：如果同一个类中个别方法需要返回视图、其余返回 JSON，可以在类上加 `@Controller`，仅在需要返回数据的特定方法上单独加 `@ResponseBody`。",
+    "pit": "如果在 `@Controller` 方法中忘记加 `@ResponseBody` 却返回了一个对象或字符串，Spring MVC 会将返回值当作 JSP/HTML 路径去寻找模板，最终必然报 404 或 500 找不到视图错误。"
+  },
+  "@RequestParam 和 @PathVariable 两个注解的区别": {
+    "oral": "两者用于获取不同格式的 HTTP 请求参数：\n- `@RequestParam`：用于获取 URL 查询字符串（Query String）中的参数（形如 `/users?id=10`）或 POST 表单（`form-data`）提交的键值对参数；\n- `@PathVariable`：用于获取 RESTful 风格中 URL 路径片段的动态占位符变量（形如 `/users/{id}`，访问 `/users/10` 时绑定到变量 `id`）。",
+    "reason": "- 默认必填性：两者默认 `required=true`，若请求路径中缺少对应参数，Spring MVC 会直接抛出 400 Bad Request 异常。\n- 默认值支持：`@RequestParam` 拥有 `defaultValue` 属性可以在参数缺失时回退默认值，`@PathVariable` 不支持 defaultValue。",
+    "pit": "若 URL 路径本身包含 `/` 或特殊编码字符，使用 `@PathVariable` 可能会发生路径解析截断，需结合正则表达式微调路由映射。"
+  },
+  "Redis为什么这么快？": {
+    "oral": "Redis 单机能做到 10 万+ QPS 核心靠四点：\n1. 纯内存操作：所有数据读写全部在内存中进行，完全消除了昂贵的磁盘寻道和 I/O 延迟；\n2. 核心架构采用单线程模型：避免了多线程并发带来的昂贵的 CPU 上下文切换与线程调度开销，彻底杜绝了各种锁竞争和死锁；\n3. 采用 I/O 多路复用机制：底层基于 Linux 的 `epoll` 模型，单线程即可同时高效轮询处理成千上万个并发 Socket 连接；\n4. 底层优异的数据结构设计：针对不同数据量级精心设计了紧凑且高效的编码（如 SDS 动态字符串、ziplist 压缩列表、quicklist、intset、跳表 skiplist）。",
+    "reason": "- Redis 6.0 引入多线程指的是什么？Redis 6.0 的多线程仅仅用于「网络数据读写和协议解析（网络 I/O）」这个网络瓶颈环节，核心的「命令执行」仍然严格保持纯单线程执行，依然天然线程安全无需加锁。",
+    "pit": "单线程架构的软肋在于：严禁在生产执行耗时长的全局命令（如 `KEYS *`、`HGETALL` 大字典、FLUSHALL），长耗时命令会彻底卡死主线程导致后续所有并发请求全面超时崩溃！"
+  },
+  "请介绍一下Redis的持久化机制": {
+    "oral": "Redis 主要支持 RDB、AOF 以及 4.0 引入的混合持久化三种模式：\n- RDB（快照）：定时将某个时间点的全量内存数据生成二进制快照文件（dump.rdb）。底层通过 `bgsave` fork 出一个子进程利用操作系统的写时复制（COW, Copy-On-Write）技术异步后台落盘。优点是恢复极快、文件紧凑；缺点是两次快照间若宕机会丢失这段时间的数据；\n- AOF（追加日志）：将每个写命令以协议格式顺序追加到 aof 文件尾部。支持三种刷盘策略（always、everysec、no，生产通用 everysec 每秒刷盘），配合 `AOF Rewrite`（瘦身重写）压缩文件。优点是数据安全性极高（最多丢 1 秒数据），缺点是文件体积大、灾难恢复比 RDB 慢；\n- 混合持久化：AOF 重写时前半段是 RDB 格式二进制数据，后半段是增量 AOF 命令，兼具了 RDB 的极速恢复与 AOF 的高可靠性。",
+    "reason": "- Fork 开销防范：当 Redis 内存巨大（如大于 20G）时，fork 子进程需要拷贝庞大的内存页表，会导致主线程发生数十毫秒到数百毫秒的短暂卡顿（STW），因此单实例内存不宜过大。",
+    "pit": "生产服务器严禁关闭持久化（除非纯粹当丢了无所谓的缓存用），否则若从节点宕机重启且主从自动同步，可能引发空数据清空全量集群的灾难。"
+  },
+  "请介绍一下Redis的内存淘汰策略": {
+    "oral": "当 Redis 内存使用达到 `maxmemory` 上限时，会根据配置的策略淘汰 Key，主要分为三类 8 种：\n1. 不淘汰直接报错：`noeviction`（默认，写操作直接报 OOM 错误拒绝，读操作正常）；\n2. 在所有 Key 中淘汰：\n   - `allkeys-lru`：按最近最少使用淘汰；\n   - `allkeys-lfu`：按最不经常使用频率淘汰；\n   - `allkeys-random`：随机淘汰；\n3. 仅在设置了过期时间（TTL）的 Key 中淘汰：\n   - `volatile-lru`：只在带 TTL 的 key 中按 LRU 淘汰；\n   - `volatile-lfu`：只在带 TTL 的 key 中按使用频率 LFU 淘汰；\n   - `volatile-random`：随机淘汰；\n   - `volatile-ttl`：淘汰剩余寿命最接近过期的 Key。",
+    "reason": "- LRU vs LFU：LRU 关注「最后一次访问的时间远近」，如果一个冷门 key 恰好被偶然访问了一次，LRU 会误认为它是热点；LFU 关注「历史访问频次计数」，对于有周期性访问特征的场景表现更加科学合理。\n- 近似算法：Redis 出于性能考虑并未使用真正的双向链表维护全量 LRU，而是采用随机抽样（默认抽 5 个 key 比较）的近似 LRU 算法，性能极高且效果接近物理 LRU。",
+    "pit": "作为业务标准缓存服务，生产绝大多数推荐配置为 `allkeys-lru` 或 `allkeys-lfu`。"
+  },
+  "什么是大Key问题，如何解决？": {
+    "oral": "大 Key 是指 value 本身体积过大（如 String 超过 10KB）或元素集合过大（如 Hash/List/Set/ZSet 包含数万乃至数百万个元素）。危害主要有：1. 占用网络带宽，发生网络拥堵；2. 耗尽单个实例内存引发内存倾斜；3. 删除或读取时由于单线程模型造成严重主线程卡死阻塞超时。",
+    "reason": "- 发现大 Key：\n  1. 使用原生命令行 `redis-cli --bigkeys` 抽样扫描；\n  2. 配合开源工具 `redis-rdb-tools` 离线分析 RDB 镜像文件找出超标 Key；\n  3. 开启慢日志抓取。\n- 解决方案体系：\n  1. 结构拆分：将超大 Hash 按照 ID 取模拆散为多个小 Hash（如 `user:info:1000` 拆为 100 个子 hash）；\n  2. 压缩存储：将复杂对象采用 Protobuf/Kryo 高效序列化压缩存储；\n  3. 异步平滑删除：严禁直接调用 `DEL` 删除大 Key！必须使用 Redis 4.0+ 提供的 `UNLINK` 异步命令由后台子线程回收内存，或者利用 SCAN 渐进式分页遍历删除。",
+    "pit": "大 Key 在 Redis Cluster 集群下极易引发集群单节点内存爆满与流量倾斜，是线上 Redis 故障的第一大元凶。"
+  },
+  "Tomcat的缺省端口是多少，怎么修改？": {
+    "oral": "传统独立版 Tomcat 的默认 HTTP 访问端口是 `8080`，默认关闭端口是 `8005`，默认 AJP 协议端口是 `8009`。修改方法有两种：\n1. 独立安装版：打开 Tomcat 安装目录下的 `conf/server.xml` 文件，找到 `<Connector port=\"8080\" protocol=\"HTTP/1.1\" .../>` 标签，将 `port=\"8080\"` 修改为目标端口（如 80 或 8081）并重启；\n2. Spring Boot 嵌入式 Tomcat：在项目配置文件（application.yml 或 application.properties）中直接配置 `server.port: 8081` 即可。",
+    "reason": "- 核心架构组件：Tomcat 包含 Connector（负责监听端口接入 Socket 连接并转换封装为 Request/Response）和 Container（Engine -> Host -> Context -> Wrapper 容器处理业务 Servlet）。修改端口实质上是在调整 Connector 的监听绑定配置。",
+    "pit": "若将端口修改为小于 1024 的特权端口（如标准 HTTP 的 80 端口），在 Linux 生产环境下必须以 root 权限运行，或者通过 Nginx 监听 80 端口再反向代理转发给 8080 的 Tomcat。"
+  },
+  "什么时候能入职？": {
+    "oral": "如果目前是在职状态，回答标准口径：“因为需要遵守劳动法和对原团队项目负责，通常需要 2 周到 1 个月办理离职交接手续。不过我目前负责的模块已经基本收尾并文档化，如果贵司这边有紧急项目上线要求，我会全力积极与现任领导沟通协调，争取在 2~3 周内快速完成交接并到岗。”\n如果目前已离职，直接回答：“目前是随时到岗状态，只要贵司录用流程走完、体检合格，1 周内即可到岗开展工作。”",
+    "reason": "- 心理考量：切忌在职时直接答“我明天就能直接走人不用管旧公司”，这会让 HR 觉得你缺乏职业道德和责任心；也不能说“要拖两三个月”，这会让用人部门因急需用人而放弃发 Offer。",
+    "pit": "回答既要体现有始有终的职业素养，又要展现对新平台的高度渴望与灵活性。"
+  },
+  "在公司里谁负责建数据库表": {
+    "oral": "在中大型公司通常遵循「DBA 专业团队与后端业务研发职责分立、协同管控」的模式。DBA 负责生产数据库的底层高可用集群搭建、备份容灾、只读从库扩缩容、权限收口与整体性能监控；业务研发负责具体业务领域的表结构设计、索引设计与日常 SQL 编写。生产环境任何 DDL 变更都必须经过工单审核流与 SQL 审计工具审批。",
+    "reason": "- 生产安全流程：研发团队在本地和测试环境自由验证，提交上线时必须通过自动化 SQL 质量平台（如 Yearning / Archery）检查，再由组内 Tech Lead 与 DBA 双重审核后由系统在低峰期自动执行。\n- 权限原则：普通研发无权直连生产主库执行 update/delete，只能通过脱敏的数据查询平台以只读账号排查问题，保障企业核心数据安全防泄密。",
+    "pit": "回答该问题时千万不要答“我们公司所有研发直接连线上生产库敲 update”，这会暴露以往团队极度缺乏工程规范和安全敬畏心。"
+  },
+  "软件项目的开发流程是什么？": {
+    "oral": "我们团队遵循标准敏捷开发规范，完整的迭代周期通常为两周：\n1. 需求评审：产品经理宣讲 PRD，研发、测试、UI 共同对齐业务背景与边界条件；\n2. 技术方案设计与评审：输出架构设计、表结构变更（DDL）、接口契约文档（Swagger/Apifox），组织跨端评审排期；\n3. 编码与自测：基于 Git Flow 建立 feature 分支，编写单元测试，完成核心功能；\n4. Code Review：提交 Merge Request，至少一名资深研发 Review 通过才允许合并；\n5. 联调与提测：部署到测试环境进行前后端联调，测试同学介入功能测试、接口自动化与性能压测；\n6. 预发布验证与上线：发布到预发环境验证生产镜像，在发布窗口期配合灰度分批全量上线，上线后观测 Prometheus / SkyWalking 监控指标及错误日志。",
+    "reason": "- 质量保障：全流程推行「代码规范扫描（SonarQube）+ 接口自测率 + CI/CD 自动化流水线构建 + 线上可观测监控」闭环。",
+    "pit": "体现专业度要带出具体的工程工具链（如 Jira、Gitlab MR、SonarQube、Jenkins/ArgoCD、SkyWalking），突出自己对工程质量闭环的敬畏心。"
+  },
+  "上家公司薪资构成，及到手多少钱": {
+    "oral": "标准沟通策略：\n1. 拆解薪资客观事实：“我上一家公司的整体薪资结构是：基本底薪 X K * 12 个月 + 季度/年终绩效浮动奖金（通常 2~3 个月）+ 餐补/房补等常规福利，综合年薪在 Y 左右”；\n2. 阐明期望增幅：“结合我过去两年的技术沉淀、负责的核心项目产出，以及对贵司目标岗位技术栈和业务挑战的深入了解，我期望的整体薪资增幅在 20%~30% 左右（如月薪达到 Z K）。不过我更看重贵司这个平台的业务成长空间和团队氛围，在贵司合理的职级薪酬体系内，整体我保持积极开放的沟通态度。”",
+    "reason": "- 沟通技巧：给出明确的数字底线区间，同时保留弹性，不要把话说死；把薪资要求与自己的「价值产出」和「岗位匹配度」挂钩，而不是单纯因为“我生活开销大所以要加薪”。",
+    "pit": "切忌虚报上家公司薪资！大厂入职背调会严格核查个税流水与社保基数，虚报会直接导致背调不通过并取消 Offer。"
+  },
+  "你对加班的看法？": {
+    "oral": "回答高情商话术：“我对加班持有客观理性的态度：在项目大促冲刺、技术攻坚发布，或者线上出现紧急突发故障需要排查等关键节点，加班是体现团队责任感和凝聚力的必然要求，我完全能够接受并会全力以赴冲在前面。但在日常工作中，我更倡导通过清晰的技术方案设计、敏捷的团队协作沟通以及良好的工程化能力来提升单位时间的工作效率，尽可能在正常工作时间内高质量交付成果，避免无意义的形式主义消耗。”",
+    "reason": "- HR 考察意图：HR 并不是想找一个无脑熬夜磨洋工的人，而是考察你的抗压能力、责任心，以及是否有成熟理性的工作价值观。",
+    "pit": "千万不要直接回答“我坚决不加班，多一分钟都不行”（直接出局），也不要违心回答“我最喜欢加班，天天通宵没问题”（显得极不真实或能力低下）。"
+  },
+  "让你设计一个秒杀系统，你会考虑哪些问题？": {
+    "oral": "设计高并发秒杀系统核心遵循「分层过滤、动静分离、缓存削峰与行级防超卖」四层法则：\n1. 动静分离：秒杀静态资源（HTML/CSS/JS/商品大图）全部下沉至 CDN 边缘节点，动态时间与秒杀按钮通过轻量时间戳接口轮询；\n2. 网关防刷与限流：Nginx 与 API 网关（Sentinel）层设置 IP/用户维度令牌桶限流，前置滑块验证码打散瞬时并发请求波峰；\n3. 缓存预热与原子扣减：秒杀前将库存写入 Redis，基于 Lua 脚本原子执行 `库存检查 + 扣减`，校验成功生成秒杀 Token 并丢入消息队列；\n4. 异步削峰落库：订单服务从 RocketMQ/Kafka 均匀拉取订单消息，基于分布式唯一 ID 幂等创建订单并扣减 MySQL 真实库存；\n5. 防超卖兜底：MySQL 更新时追加 `update stock = stock - 1 where id = x and stock > 0` 乐观锁行级防御。",
+    "reason": "- 超卖（Over-selling）三大防线：Redis Lua 原子脚本第一道防线，消息队列排队第二道防线，数据库行锁 `where stock > 0` 最终兜底。\n- 超时回滚：未在 15 分钟内支付的订单，监听死信队列或延迟消息，执行 Redis 库存原子回补与订单取消。",
+    "pit": "秒杀接口绝对不能直接暴露固定的静态 URL，必须在秒杀开始前几十秒通过随机生成的加密 Salt 动态暴露秒杀 Path，防止黑产脚本提前刷单抢购。"
+  },
+  "什么是分布式事务": {
+    "oral": "分布式事务是指在分布式系统微服务架构下，一个业务操作需要跨越多个独立的微服务节点或操作多个独立的异构数据库，必须确保这些跨网络跨数据源的变更要么全部成功，要么全部回滚。核心是在无共享存储环境下保障分布式数据一致性（BASE 理论的最终一致性）。",
+    "reason": "- 经典场景：电商下单扣减库存（库存服务），扣减用户余额（支付服务），创建订单（订单服务），三者位于三个独立的数据库；\n- 常用工业级方案：\n  1. 阿里 Seata AT 模式：无侵入自动补偿，依赖全局锁与 UNDO LOG；\n  2. 本地消息表 / MQ 事务消息：最大努力通知与可靠异步最终一致；\n  3. TCC 模式：Try-Confirm-Cancel，性能最高，适合金融高并发；\n  4. SAGA 模式：长事务状态机编排与反向补偿。",
+    "pit": "分布式事务最大的设计误区就是到处用。生产应首先反思微服务拆分是否过细，优先通过领域聚合将紧密业务收归单库本地事务解决。"
+  },
+  "Netty的零拷贝是怎么实现的？": {
+    "oral": "Netty 的零拷贝主要体现在四个层面：\n1. 堆外内存（DirectByteBuf）：直接通过 Socket 进行数据传输，避免了 JVM 堆内存与操作系统内核 Socket 缓冲区之间的两次数据冗余复制；\n2. 逻辑组合切片（CompositeByteBuf）：将多个物理 ByteBuf 逻辑合并为一个整体，避免物理拼接内存拷贝；\n3. 内存切片（ByteBuf.slice）：对已有 ByteBuf 共享底层内存切片，不产生任何内存拷贝；\n4. 内核文件传输：通过 `DefaultFileRegion` 包装 `FileChannel.transferTo()`，直接在内核态通过 DMA 将文件数据发往网络，完全不经过用户态 CPU 拷贝。",
+    "reason": "- 传统 BIO 拷贝开销：磁盘 -> 内核缓冲区 -> JVM 堆内存 -> Socket 缓冲区 -> 网卡，共 4 次拷贝和 4 次上下文切换。\n- Netty 的 transferTo：磁盘 -> 内核缓冲区 -> 网卡（通过 DMA），仅 2 次拷贝和 2 次上下文切换，零 CPU 参与。",
+    "pit": "堆外直接内存虽然性能极高，但不受普通垃圾回收期直接控制，若分配后未及时通过引用计数（`ReferenceCountUtil.release()`）正确回收，极易引发本地直接内存溢出（Direct buffer memory OOM）。"
+  },
+  "Netty的线程模型是怎么样的？": {
+    "oral": "Netty 基于经典的「主从 Reactor 多线程模型」设计：\n1. BossGroup：主 Reactor 线程池，负责监听端口并接收客户端的 TCP 握手连接请求，将生成的 Channel 注册到 Worker 线程池；\n2. WorkerGroup：从 Reactor 线程池，负责监听连接的读写事件，并在对应的 EventLoop 线程中执行 ChannelPipeline 上的 ChannelHandler 拦截处理；\n3. 业务线程池（可选）：如果在 Handler 中需要执行慢 SQL 或耗时 RPC 业务，必须手动提交到自定义业务线程池异步执行，防止阻塞当前唯一的 EventLoop 线程。",
+    "reason": "- 单线程无锁化：每个 Channel 终其一生绑定在一个固定的 EventLoop 线程上，其所有 I/O 事件在该线程内串行执行，完全省去了并发加锁开销。\n- 线程数建议：BossGroup 通常配 1 个线程足够，WorkerGroup 默认配置为 `CPU核数 * 2`。",
+    "pit": "新手最容易犯的严重错误：在 ChannelInboundHandler 的 channelRead 中直接调用外部同步堵塞服务（如发邮件、远程 RPC、JDBC 查库），这会把绑定在该 EventLoop 上的几千个连接彻底卡死！"
+  },
+  "Netty如何解决TCP粘包、拆包的问题的？": {
+    "oral": "TCP 是面向流的无边界传输协议，产生粘包/拆包的根本原因在底层 TCP 报文缓冲区（MSS/MTU）及 Nagle 算法。Netty 提供了四种开箱即用的编解码器解决包边界判定：\n1. 定长解码器（`FixedLengthFrameDecoder`）：按照固定字节长度截取消息；\n2. 行分隔符解码器（`LineBasedFrameDecoder`）：按照 `\\n` 或 `\\r\\n` 换行符拆包；\n3. 特殊分隔符解码器（`DelimiterBasedFrameDecoder`）：按照自定义分隔符截断；\n4. 长度字段帧解码器（`LengthFieldBasedFrameDecoder`，生产最通用）：在消息头中记录真实 Body 字节长度，依据长度精准提取整包。",
+    "reason": "- 自定义协议标准：工业级 RPC（如 Dubbo、gRPC）通常采用「协议头魔数 + 版本 + 消息类型 + Body 长度 + 消息体」格式，配合 LengthFieldBasedFrameDecoder 能完美防范任何粘包与拆包。",
+    "pit": "配置 `LengthFieldBasedFrameDecoder` 时参数极易算错（`lengthFieldOffset`、`lengthFieldLength`、`lengthAdjustment`、`initialBytesToStrip`），需结合协议头精确对齐字节偏移量。"
+  },
+  "你为什么离开原来的公司？": {
+    "oral": "离职原因回答原则为「归因于客观发展，感恩过往平台，绝不拉踩旧公司」：\n标准高情商表达：“在上家公司的这几年，我非常感谢原团队领导和伙伴对我的信任与培养，我不仅深度参与并负责了多项核心业务系统从 0 到 1 的研发，技术广度和业务架构能力都得到了很好的磨练。但目前原团队的业务形态整体已经进入了非常平稳的成熟维护期，技术挑战和新的业务增量相对有限；而我个人一直渴望能在更加敏捷、业务体量更大、并发要求更高的场景中接受挑战，承担更大的技术责任。贵司目前的技术栈和业务发展方向与我的职业规划高度契合，因此我慎重考虑后选择寻求新的突破。”",
+    "reason": "- HR 核心考察点：求职者的离职动机是否理性稳定，是否有很强的团队协作适应能力，离职原因是否会在本公司再次重现。\n- 禁忌雷区：严禁吐槽前公司领导不好、同事勾心斗角、加班太严重或制度混乱，这类主观抱怨在 HR 看来意味着求职者抗压差、抱怨多、不成熟。",
+    "pit": "若是因为公司整体战略收缩或业务线裁员，可以坦荡客观说明事实并出具正式离职证明，HR 完全能够理解。"
+  },
+  "你最大的缺点是什么？": {
+    "oral": "回答缺点的原则是「真实、非技术硬伤、有自省觉察、且有明确的改进落地行动」：\n标准回答范例：“我过去发现自己有时过于追求细节和代码方案的完美度，在项目前期架构选型或代码重构时，容易在非核心的辅助细节上投入过多精力，甚至有时候会给同组开发带来一定的技术洁癖压力。后来我意识到，在商业工程落地中，‘平衡与交付’往往比盲目追求‘绝对完美’更重要。因此我后来主动调整，在接到需求后会先做优先级四象限划分，严格遵循 MVP（最小可行性产品）原则和团队排期节奏，把 80% 的精力聚焦在最核心业务与稳定性指标上，目前在项目节奏把控和实用交付上已经改善了很多。”",
+    "reason": "- 经典坏回答避坑：\n  1. 不要抖机灵（如“我最大的缺点就是太拼命工作”、“对自己要求太高”），HR 听过无数遍，显得油滑不真诚；\n  2. 不要暴露硬伤（如“我性格孤僻讨厌团队沟通”、“我容易拖延忘事”），这会直接被一票否决。",
+    "pit": "回答的核心公式：【真实小缺点（最好带点工作认真属性）】 + 【负面影响自省】 + 【具体的改进方法与当前成效】。"
+  },
+  "为什么Netty适合做网络编程？": {
+    "oral": "Netty 是基于主从 Reactor 多线程模型的异步事件驱动网络框架。核心架构包含：EventLoopGroup（事件循环线程组，分为负责接收连接的 BossGroup 和负责读写业务的 WorkerGroup）、Channel（网络连接抽象）、ChannelPipeline（双向链表拦截器管道）、ChannelHandler（业务处理器）以及 ByteBuf（零拷贝高效内存缓冲区）。",
+    "reason": "- 零拷贝（Zero-Copy）技术：\n  1. 使用堆外直接内存（DirectByteBuf），避免 JVM 堆与 Socket 缓冲区间的冗余内存复制；\n  2. 采用 `CompositeByteBuf` 逻辑合并多个 Buffer，无需物理拼接；\n  3. 基于 `FileChannel.transferTo()` 实现操作系统内核级 DMA 传输。\n- 内存池化管理：采用类似 jemalloc 的 `PooledByteBufAllocator`，重复复用内存块，极大减轻高并发下的 GC 垃圾回收压力。",
+    "pit": "在 ChannelHandler 的读写事件回调中，严禁执行耗时的阻塞式业务（如长耗时 JDBC 查询或远程 RPC），必须将耗时任务分派到专用的业务线程池中执行，否则会导致当前 EventLoop 单线程卡死，同一线程上绑定的几千个客户端连接全量停滞。"
+  },
+  "RAG 的全称是什么？解释其核心流程": {
+    "oral": "RAG 全称 Retrieval-Augmented Generation（检索增强生成）。核心三步：\n1. 检索（Retrieval）：用户提问后，通过关键词或向量相似度从私有知识库检索 Top-K 相关文本块（Chunks）；\n2. 增强（Augmentation）：将检索出的上下文文档、用户原始 Query 及系统指令进行 Prompt 编排封装；\n3. 生成（Generation）：输入给大语言模型（LLM），由模型基于参考资料生成兼具时效性与准确性的回答。",
+    "reason": "- 核心解决三大痛点：\n  1. 克服 LLM 内部参数知识截止期问题（无须频繁重新微调）；\n  2. 大幅降低特定领域幻觉（有据可查）；\n  3. 保护企业私有数据安全（数据保留在本地向量库，不暴露给公网基础模型预训练）。",
+    "pit": "千万不要认为 RAG 只是把文本切一切丢进向量库。生产中 80% 的问题出在【切块粒度（Chunking）失真】与【向量检索对专有名词不敏感】上，必须配合混合检索与重排序（Rerank）。"
+  },
+  "Naive RAG 的三大瓶颈是什么？": {
+    "oral": "传统初级 Naive RAG 的三大核心瓶颈是：\n1. 检索质量差：用户提问通常很短，而文档块很长，短 Query 与长文档在向量空间存在表征语义不对齐，极易召回语义相近但毫无价值的噪音；\n2. 生成幻觉：大模型容易产生注意力漂移（Lost in the Middle），即使检索到了正确文档，依然可能凭借自身参数记忆胡言乱语；\n3. 单轮死板：检索是一锤子买卖，无法根据初步检索结果评估质量，检索偏了就无法纠偏挽回。",
+    "reason": "- 对应工业界演进解法：\n  针对瓶颈 1 演进出 HyDE 伪文档、BM25+Dense 混合检索、BGE-Reranker；\n  针对瓶颈 2 演进出引用溯源约束与提取式生成；\n  针对瓶颈 3 演进出 Self-RAG、CRAG（自反思/纠错循环）和 Agentic RAG。",
+    "pit": "面试时不要只列缺点，一定要主动引出自己项目采用的优化方案（如：'我们在项目中引入了 HyDE 和 BGE-Reranker 做二次精排，将 Top-3 命中率从 68% 提升到了 89%'）。"
+  },
+  "Agent 的四大核心组件是什么？各自负责什么？": {
+    "oral": "大模型智能体（AI Agent）的核心架构由四大组件构成：\n1. 大脑（LLM）：负责任务理解、逻辑推理、意图拆解与最终决策；\n2. 身体/双手（Tools/Actions）：通过 Function Calling 或 MCP 协议调用外部世界（搜索引擎、计算器、执行代码、操作数据库 API）；\n3. 笔记本/记忆（Memory）：短期记忆（多轮会话上下文滑动窗口）与长期记忆（通过向量库持久化用户偏好与历史事实）；\n4. 指挥官/规划（Planning）：将复杂多跳长任务拆解成步骤序列，并在执行遇到异常时进行动态重规划（Dynamic Re-planning）。",
+    "reason": "- Agent 核心公式：Agent = LLM + Planning + Tools + Memory。\n- 与传统软件对比：传统程序是硬编码 if-else 执行确定性逻辑；Agent 是自主根据环境反馈（Observation）进行闭环动态循环（Think → Act → Observe）。",
+    "pit": "必须明确指出：检索（RAG）在 Agent 架构里本质上只是 Tools 里的其中一个可调用工具，Agent 是更高维度的闭环决策流。"
+  },
+  "Agent 和 RAG 的本质区别是什么？": {
+    "oral": "RAG 和 Agent 的本质区别在于「信息管道流」与「行动决策流」的区别：\n1. RAG 关心的是「信息怎么送给 LLM」：本质是确定性的单向管道（Retrieve → Augment → Generate），LLM 只负责最终的阅读理解与内容总结；\n2. Agent 关心的是「LLM 自主决定拿什么、怎么做」：具备自主目标意识，采用循环决策机制（思考 Thought → 行动 Action → 观察反馈 Observation → 再次思考），自己决定查什么、调哪个工具、什么时候达成目标并终止。",
+    "reason": "- 架构定位：RAG 是知识增强的单点技术，Agent 是智能体的全生命周期控制流；\n- 融合趋势：当 RAG 引入了路由选择、问题动态拆解和自反思校验时，它就演进成了 Agentic RAG。",
+    "pit": "回答时切忌把两者对立起来。生产架构中通常是：Agent 作为上层调度中枢，遇到专业领域知识问题时，调起后端的 RAG 检索流水线作为其专属知识工具。"
+  },
+  "ReAct 的完整循环是什么？画出来": {
+    "oral": "ReAct（Reasoning + Acting）的经典执行循环是：Thought → Action → Observation → Thought ... 最终输出 Final Answer：\n1. Thought（思考）：模型根据当前目标与历史上下文，推理分析出下一步需要执行什么动作、调用什么工具及提取什么参数；\n2. Action（行动）：模型以结构化格式（如 Function Calling JSON）发出调用指令并执行；\n3. Observation（观察）：系统执行工具后将真实环境结果（API 返回、终端输出）回传拼入 Prompt；\n4. 更新推理：模型结合最新的 Observation 进行自省，若信息已足够则输出 Final Answer，否则继续循环。",
+    "reason": "- 相比纯 Chain-of-Thought（CoT）：CoT 只能靠模型自身内省，容易产生逻辑幻觉；ReAct 引入外部 Observation 作为客观事实锚点，随时纠偏。\n- 相比纯 Action：纯 Action 缺乏思考链条，容易盲目乱调工具，无法处理多步依赖任务。",
+    "pit": "工程落地必须设置 `max_steps`（如限制最大 8-10 步），防止工具调用失败或结果不符合预期时导致 Agent 陷入无限死循环烧空 Token。"
+  },
+  "什么是 HyDE？它为什么有效？": {
+    "oral": "HyDE 全称 Hypothetical Document Embeddings（假设性文档嵌入）：\n1. 执行过程：收到用户提问后，先不直接拿 Query 去检索，而是让 LLM 根据提问“凭空畅想/假设”生成一篇 200-300 字的伪答案文档（哪怕里面存在事实错误也无妨）；\n2. 为什么有效：用户 Query 往往只有十几个字（短查询），而知识库的 Chunk 往往有几百字（长文档），在向量表征空间存在天然结构隔阂。LLM 生成的伪文档在语言模式、段落组织和关键词分布上与真实文档高度同构，用伪文档的向量去检索，能极大拉近向量空间相似度，命中准确率显著提升。",
+    "reason": "- 核心原理：利用 LLM 强大的生成模式对齐能力，弥合短文本与长文档之间的语义分布差距。\n- 适用场景：专业概念名词解释、长逻辑推理解答等提问简略但需要深层上下文匹配的场景。",
+    "pit": "缺点是多了一次 LLM 生成请求，首字延迟会增加 1-2 秒；在提问极其具体或对实时性要求苛刻的系统中不宜无脑开启，可配合路由按需触发。"
+  },
+  "ColBERT 和传统双塔模型的本质区别是什么？": {
+    "oral": "传统双塔模型采用「早期池化单向量」，而 ColBERT 采用「Token 级别多向量 + 晚期交互（Late Interaction / MaxSim）」：\n1. 传统双塔（Bi-Encoder）：将整段 Query 和整个 Document 分别压缩编码为单个 768 或 1024 维密集向量，做单次点积或余弦相似度。缺陷是长文本的信息被暴力压缩，局部细粒度关键词被稀释丢失；\n2. ColBERT：保留 Query 中的每一个 Token 向量和 Document 中的每一个 Token 向量，相似度计算时对 Query 的每个词在 Document 所有词向量中找最高相似度（MaxSim）后求和。保留了极其细腻的局部词法与语义对齐。",
+    "reason": "- 速度与精度的完美权衡：交互被推迟到了最后的点积比对阶段（可由 CPU/GPU 极速矩阵运算完成），文档端仍可提前离线向量化建立倒排索引，兼具了双塔的高召回速度与 Cross-Encoder 的超高精度。",
+    "pit": "ColBERT v1 的致命缺陷是存储开销巨大（每个 token 都要存向量，膨胀几十倍）；生产必须采用 ColBERT v2 的「残差量化压缩（Residual Compression）」，将存储空间压缩 8-10 倍。"
+  },
+  "CRAG 的核心机制是什么？怎么实现？": {
+    "oral": "CRAG 全称 Corrective RAG（纠错检索增强生成），其核心思想是在检索与生成之间加入一个「检索质量评估器（Retrieval Evaluator）」，实现三路动态纠偏分支：\n1. 正确（Correct）：若检索结果与提问高度相关，直接对文档进行知识提炼过滤后送入 LLM；\n2. 错误（Incorrect）：若检索结果完全不相关或置信度极低，彻底舍弃本地召回，自动降级切换至公网搜索引擎（如 Tavily / Bing API）重新检索外部知识；\n3. 模糊待定（Ambiguous）：若置信度处于临界中段，将本地检索结果与公网 Web 搜索结果进行混合互补，保障答案完整性。",
+    "reason": "- 彻底打破 Naive RAG 的“检索到垃圾就只能吃垃圾”的开环缺陷，实现了从“检索召回”到“输入给模型”之间的自愈能力。\n- 实现方式：通常使用轻量级小模型（如 fine-tuned T5 / Cross-Encoder）对每个 chunk 快速打分判定置信度，几乎不增加主模型延迟。",
+    "pit": "面试切忌把 CRAG 和 Self-RAG 搞混：CRAG 是「检索后的单次阶段性纠偏与换源」；而 Self-RAG 是在「生成文本的全生命周期中插入反思标记」动态多次决策。"
+  },
+  "为什么需要 Reranker？粗排和精排的分工是什么？": {
+    "oral": "在成熟工业级检索架构中，必须采用「粗排召回 + 精排重排（Rerank）」的分层漏斗设计：\n1. 粗排（Bi-Encoder / 向量检索 / BM25）：目标是【高召回率 + 极高速度】。从全量百万、千万级文档库中，利用 ANN 向量索引在 10ms 内快速筛选出 Top-100 候选集；\n2. 精排（Cross-Encoder / Reranker）：目标是【极致精确度】。将 Query 和 Candidate Doc 拼接为一个完整输入送入深度交叉注意力模型，计算全序列交互权重，从 Top-100 中重新打分选出最精准的 Top-3 或 Top-5 送给 LLM；\n3. 分工原因：Cross-Encoder 效果最好但每两两比对一次都需要完整的 Self-Attention，无法针对海量库做全局扫描；双塔虽快但信息压缩损失大。二者结合是算力与精度的最优工程解。",
+    "reason": "- 生产选型推荐：中文首选 BAAI/bge-reranker-large，商业级可选用 Cohere Rerank 3，轻量低延迟可选 ColBERT Reranker。",
+    "pit": "重排时注意 Context 长度限制，送入 Reranker 前要做好 Chunk 规范化截断；另外要过滤掉粗排中低置信度（如余弦相似度 < 0.3）的离群点，减少无效计算开销。"
+  },
+  "短期/中期/长期记忆怎么区分？各自用什么存储？": {
+    "oral": "在 Agent 工程化落地中，标准三层 Memory 体系分工如下：\n1. 短期记忆（Short-term Memory）：指当前正在进行的单次会话上下文，包含用户与 Agent 的多轮对话及 Tool 调用详情。采用关系数据库（PostgreSQL/MySQL）的 `conversation_history` 表存储，采用滑动窗口或 Token 预算裁剪加载；\n2. 中期记忆（Working/Session Memory）：跨会话的关键事实摘要与用户上下文。当会话结束或达到 N 轮时，由后台轻量 LLM 异步压缩提取会话核心结论存入 `session_summary` 表，带 TTL 自动淘汰；\n3. 长期记忆（Long-term Memory）：用户的永久事实偏好、知识画像与核心背景（如用户姓名、业务禁忌、工作习惯）。存入 `user_memory` 表，字段包含内容与向量字段（Embedding），通过向量相似度在对话初始按需语义唤醒。",
+    "reason": "- 避免上下文爆炸：不能把所有历史无脑丢给 LLM，必须通过「短期完整 + 中期摘要 + 长期向量检索」动态组装最精简有效的 Context。\n- 长期记忆更新法则：采用 Upsert + 时间戳机制，用户发生新指令纠错时（如'我换工作到北京了'），必须以最新声明为准覆盖旧知识并记录变更 Log。",
+    "pit": "千万不要把所有东西都向量化当长期记忆存！用户偶尔的一句情绪发泄或闲聊会被向量召回当成永久画像污染上下文，必须设置记忆沉淀前置判定。"
+  },
+  "Agent 工具调用失败的三层处理策略是什么？": {
+    "oral": "工业级 Agent 针对工具调用失败必须建立严格的三层防御体系：\n1. 第一层：自动重试与参数自愈。针对临时网络抖动采用指数退避重试（1s→2s→4s，最多 3 次）；针对 Schema 参数格式报错，将校验异常信息直接追加回 Prompt，让 LLM 进行一次自我修复重试；\n2. 第二层：降级与备用策略（Fallback）。若主工具持续失效，执行策略降级：例如高精度内部 API 超时，切换降级为全网搜索引擎；或者降低召回阈值、切换轻量备用模型尝试解析；\n3. 第三层：优雅兜底与人工回退。确认工具彻底不可用时，严禁让模型自由臆造假数据！必须直接向用户坦诚告知服务不可用、给出已获取的部分结果并打上未完成标识，同时触发后台日志告警接入人工客服工单。",
+    "reason": "- 生产最怕的现象：工具返回 404 或空数组，Agent 误以为找不到，便开始发挥想象力胡编乱造。\n- 核心准则：不可靠的输出比坦白承认失败造成的生产资损严重得多。",
+    "pit": "工具返回空数据（Empty List）不等于工具调用失败，切忌对空结果无脑循环重试，必须教模型学会根据空结果变更查询策略或直接告知用户未检索到。"
+  },
+  "Agent 和 Workflow 的区别是什么？各自的适用场景？": {
+    "oral": "Agent 和 Workflow 是目前大模型系统落地的两种核心形态：\n1. Workflow（工作流）：属于「确定性编排」。节点流转路径、分支条件和执行顺序由人类工程师在代码或画布（如 Dify/Langflow）中预先定死，LLM 只充当单个节点的处理算子。特点是：极高稳定性、可控、低延迟、成本低、容易调试；\n2. Agent（自主智能体）：属于「动态决策编排」。由 LLM 自主决定执行什么步骤、何时调用工具、何时循环重试。特点是：极高灵活性、适应未定义开放场景，但存在不确定性、延迟高、Token 消耗大且调试困难；\n3. 工业最佳实践：80% 业务场景应该使用【以 Workflow 为主骨架 + 局部关键节点引入 Agent 动态决策】（即 Router Agent / Agent Node）。",
+    "reason": "- 典型场景区分：固定发票报销审批流、客服问答流水线用 Workflow；跨系统复杂代码重构、全网自主深度研报分析用 Agent。",
+    "pit": "面试常见送命题：“你们项目中全用 Agent 吗？”——一定要体现工程敬畏心，强调'能用规则用规则，能用 Workflow 用 Workflow，只在开放高不确定节点使用 Agent'，体现资深工程经验。"
+  }
+}

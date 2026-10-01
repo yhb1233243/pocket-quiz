@@ -2,7 +2,7 @@
 
 局域网单页面试刷题站：读取本地 Markdown 题库，一题一题刷 / 背，进度落盘，AI 讲解走 OpenAI 兼容接口。纯 Python 标准库，零依赖，前端零构建。
 
-> 本仓库只包含代码和一份**原创示例题库**。题库格式开放，你可以挂任何自己的 Markdown 题集；仓库内不含任何第三方题库内容。
+> 仓库包含程序代码、原创示例题库，以及项目维护者确认已获得公开再分发授权的面试题库。题库授权范围与代码许可证分开，详见 [BANK-NOTICE.md](BANK-NOTICE.md)。
 
 ## 快速开始
 
@@ -12,7 +12,7 @@ python server.py
 
 本机访问 http://127.0.0.1:8765 ，终端会同时打印局域网地址（手机同一 Wi-Fi 可用）。Windows 防火墙需放行对应端口。
 
-首次运行不需要任何配置：默认加载 `bank/sample/` 里的示例题。
+首次运行不需要任何配置：仓库内的 `topics.json` 会加载示例题库、Python/大模型题库和 Java 题库。
 
 ## 挂自己的题库
 
@@ -64,10 +64,15 @@ server.py            局域网服务端（stdlib only）
 build_static.py      离线单文件打包器
 static/              前端单页（HTML/CSS/JS，PWA）
 bank/sample/         原创示例题库
+bank/python-bagu/    Python 题库
+bank/llm-algo/       大模型算法题库
+bank/java/           Java、MySQL、框架和中间件题库
+curated_answers.json 人工整理答案补充
+topics.json          当前公开题库清单
 topics.example.json  题库清单示例
 config.example.json  配置示例
 ```
 
 ## License
 
-Apache-2.0，见 [LICENSE](LICENSE)。示例题库（`bank/sample/`）同为 Apache-2.0。
+程序代码和原创示例题库使用 Apache-2.0，见 [LICENSE](LICENSE)。已授权题库不自动适用 Apache-2.0，其权利与使用范围以 [BANK-NOTICE.md](BANK-NOTICE.md) 及原始授权为准。

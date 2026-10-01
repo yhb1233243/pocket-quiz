@@ -21,6 +21,13 @@ def build():
         bank = server.resolve_path(cfg.get("bank_dir") or "")
     curated = server.load_json(server.CURATED_PATH, {})
     questions, topics = server.load_bank(bank, curated, topics_cfg)
+    media_roots = [bank]
+    for _, files in topics_cfg:
+        for _, _, _, override in files:
+            if override:
+                root = server.resolve_path(override)
+                if root not in media_roots:
+                    media_roots.append(root)
     ai = server.load_ai_from_opencode(cfg)
     registry = ai.get("registry") or {}
 
@@ -33,15 +40,20 @@ def build():
             return m.group(0)
         rel = src[len("/media/"):]
         if rel not in media_cache:
-            f = (bank / rel)
-            try:
-                data = f.read_bytes()
-                ext = f.suffix.lower().lstrip(".")
-                mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-                        "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml"}.get(ext, "application/octet-stream")
-                media_cache[rel] = f"data:{mime};base64," + base64.b64encode(data).decode("ascii")
-            except Exception:
-                media_cache[rel] = ""
+            media_cache[rel] = ""
+            for root in media_roots:
+                f = root / rel
+                if not f.is_file():
+                    continue
+                try:
+                    data = f.read_bytes()
+                    ext = f.suffix.lower().lstrip(".")
+                    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                            "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml"}.get(ext, "application/octet-stream")
+                    media_cache[rel] = f"data:{mime};base64," + base64.b64encode(data).decode("ascii")
+                    break
+                except OSError:
+                    continue
         tok = media_cache[rel]
         return f"![{m.group(1)}]({tok})" if tok else ""
 

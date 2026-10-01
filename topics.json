@@ -1,0 +1,345 @@
+[
+  {
+    "topic": "Python八股",
+    "files": [
+      {
+        "module": "语言特性",
+        "file": "语言特性.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      },
+      {
+        "module": "操作系统",
+        "file": "操作系统.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      },
+      {
+        "module": "数据库",
+        "file": "数据库.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      },
+      {
+        "module": "网络",
+        "file": "网络.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      },
+      {
+        "module": "进程通信",
+        "file": "NIX.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      },
+      {
+        "module": "数据结构",
+        "file": "数据结构.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      },
+      {
+        "module": "编程题",
+        "file": "编程题.md",
+        "parse": "h1",
+        "base": "bank/python-bagu"
+      }
+    ]
+  },
+  {
+    "topic": "大模型算法",
+    "files": [
+      {
+        "module": "大模型基础",
+        "file": "大模型基础.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      },
+      {
+        "module": "优化与微调",
+        "file": "优化与微调.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      },
+      {
+        "module": "高效微调",
+        "file": "高效微调.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      },
+      {
+        "module": "LangChain",
+        "file": "LangChain.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      },
+      {
+        "module": "PyTorch实战",
+        "file": "PyTorch实战.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      },
+      {
+        "module": "公司真题",
+        "file": "公司真题.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      },
+      {
+        "module": "HR话术",
+        "file": "HR话术.md",
+        "parse": "h1",
+        "base": "bank/llm-algo"
+      }
+    ]
+  },
+  {
+    "topic": "Java 基础",
+    "files": [
+      {
+        "module": "Java核心语法",
+        "file": "Java核心语法（底线必会）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "Java集合框架",
+        "file": "Java集合框架（经典八股）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "Java并发编程",
+        "file": "Java并发编程（多线程）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "Java虚拟机",
+        "file": "Java虚拟机（JVM）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "MySQL",
+    "files": [
+      {
+        "module": "SQL与事务",
+        "file": "MySQL-SQL语法和数据库事务.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "原理与优化",
+        "file": "MySQL-内部原理与SQL优化.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "经典框架",
+    "files": [
+      {
+        "module": "Spring全家桶",
+        "file": "经典框架-Spring、SpringMVC和SpringBoot.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "SpringCloud",
+        "file": "经典框架-SpringCloud.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "MyBatis",
+        "file": "经典框架-Mybatis.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "中间件",
+    "files": [
+      {
+        "module": "Redis",
+        "file": "中间件-Redis.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "Kafka",
+        "file": "中间件-Kafka.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "RabbitMQ",
+        "file": "中间件-RabbitMQ.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "Nginx",
+        "file": "中间件-Nginx.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "MongoDB",
+        "file": "中间件-MongoDB.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "ElasticSearch",
+        "file": "中间件-ElasticSearch.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "网络服务器",
+    "files": [
+      {
+        "module": "Tomcat",
+        "file": "网络服务器-Tomcat.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "Netty",
+        "file": "网络服务器-Netty.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "基础理论",
+    "files": [
+      {
+        "module": "设计模式",
+        "file": "基础理论-设计模式.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "分布式",
+        "file": "基础理论-分布式.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "网络与安全",
+        "file": "基础理论-网络与信息安全.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "云计算",
+        "file": "基础理论-云计算.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "开发实践",
+    "files": [
+      {
+        "module": "场景题",
+        "file": "开发实践-场景题.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "线上维护",
+        "file": "开发实践-线上维护、性能优化与bug修复.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "团队协作",
+        "file": "开发实践-团队协作与开发流程.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "人事面",
+    "files": [
+      {
+        "module": "人事面",
+        "file": "人事面.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  },
+  {
+    "topic": "数据结构与算法",
+    "files": [
+      {
+        "module": "栈和队列",
+        "file": "数据结构与算法/栈和队列（28题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "链表",
+        "file": "数据结构与算法/链表（30题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "树",
+        "file": "数据结构与算法/树（31题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "排序",
+        "file": "数据结构与算法/排序（30题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "散列表",
+        "file": "数据结构与算法/散列表（30题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "贪心算法",
+        "file": "数据结构与算法/贪心算法（24题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "回溯算法",
+        "file": "数据结构与算法/回溯算法（30题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "动态规划",
+        "file": "数据结构与算法/动态规划（28题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      },
+      {
+        "module": "图论",
+        "file": "数据结构与算法/图论（24题）.md",
+        "parse": "h1",
+        "base": "bank/java"
+      }
+    ]
+  }
+]
