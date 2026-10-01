@@ -127,6 +127,24 @@
       </div>
 
       <div class="sidebar-group">
+        <div class="group-title">答案图片模型</div>
+        <div class="ai-key-setting">
+          <div class="ai-key-row">
+            <input type="text" id="ai-image-base-input" placeholder="图片接口地址（如 https://api.openai.com/v1）" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="ai-key-row">
+            <input type="text" id="ai-image-model-input" placeholder="图片模型，如 gpt-image-2" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="ai-key-row">
+            <input type="password" id="ai-image-key-input" placeholder="图片 API Key（留空用上方）" autocomplete="off" spellcheck="false">
+            <button type="button" id="ai-image-save">保存</button>
+            <button type="button" id="ai-image-clear" title="清除图片配置">清除</button>
+          </div>
+          <div class="ai-key-status" id="ai-image-status">留空则使用上方大模型地址和 Key</div>
+        </div>
+      </div>
+
+      <div class="sidebar-group">
         <div class="group-title">复习统计</div>
         <div class="stats-box" id="stats"></div>
       </div>
