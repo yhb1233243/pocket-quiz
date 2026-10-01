@@ -1,0 +1,18 @@
+# 本地/个人数据
+config.json
+topics.json
+data/
+__pycache__/
+*.pyc
+
+# 第三方版权题库与大型产物（不要提交）
+bank/python-bagu/
+bank/llm-algo/
+bank/obsidian/
+curated_answers.json
+*.zip
+面试刷题-离线版.html
+*.pdf
+
+# 本地截图
+mobile_*.png

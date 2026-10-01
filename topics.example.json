@@ -1,0 +1,9 @@
+[
+  {
+    "topic": "示例专题",
+    "files": [
+      { "module": "示例模块", "file": "Java语言.md", "parse": "h1", "base": null },
+      { "module": "速记闪卡", "file": "概念闪卡.md", "parse": "flashcard", "base": null }
+    ]
+  }
+]

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Java & AI 架构面试刷题助手</title>
+  <meta name="theme-color" content="#090d16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="刷题">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- 移动端顶部导航 -->
+  <header class="mobile-navbar">
+    <button class="icon-btn" id="btn-open-sidebar" aria-label="打开题库目录与筛选">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="mobile-title-wrap">
+      <span class="m-topic-name" id="m-crumb-topic">Java 核心</span>
+      <span class="m-counter-badge" id="m-crumb-counter">1/817</span>
+    </div>
+    <div class="mobile-nav-tools">
+      <button class="m-mode-btn" id="m-toggle-mode" title="点击在刷题和背题模式间切换">
+        <span id="m-mode-icon">✍️</span>
+        <span id="m-mode-text">刷题</span>
+      </button>
+      <button class="m-ai-btn" id="btn-open-ai" title="打开 AI 面试官讲解">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM4 11a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7z"/><circle cx="9" cy="14" r="1.5" fill="#0b0f17"/><circle cx="15" cy="14" r="1.5" fill="#0b0f17"/></svg>
+        <span>AI</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 遮罩背景 -->
+  <div class="backdrop" id="sidebar-backdrop"></div>
+  <div class="backdrop" id="ai-backdrop"></div>
+
+  <div id="app">
+    <!-- 侧边栏（移动端为左侧抽屉，桌面端固定在左） -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <div class="brand">
+          <div class="brand-sub">FULLSTACK & AI AGENT</div>
+          <h1>面试刷题助手</h1>
+          <p id="ai-status">检测中…</p>
+        </div>
+        <button class="close-icon-btn mobile-only" id="btn-close-sidebar" aria-label="关闭侧边栏">✕</button>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="group-title">学习模式</div>
+        <div class="mode-segmented" role="tablist">
+          <button id="mode-practice" class="active" data-mode="practice">✍️ 刷题模式</button>
+          <button id="mode-memorize" data-mode="memorize">📖 背题模式</button>
+        </div>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="group-title">题库范围</div>
+        <label class="field-item">
+          <span class="field-label">知识专题</span>
+          <select id="topic-select"></select>
+        </label>
+        <label class="field-item">
+          <span class="field-label">细分模块</span>
+          <select id="module-select"></select>
+        </label>
+        <label class="field-item">
+          <span class="field-label">题目筛选</span>
+          <select id="filter-select">
+            <option value="all">全部题目</option>
+            <option value="unseen">未看题目</option>
+            <option value="seen">已看题目</option>
+            <option value="wrong">✕ 错题 / 不会</option>
+            <option value="mastered">✓ 已掌握</option>
+            <option value="starred">★ 收藏题目</option>
+            <option value="core">🔥 核心必背题</option>
+          </select>
+        </label>
+        <label class="check-item">
+          <input type="checkbox" id="shuffle">
+          <span>随机乱序出题</span>
+        </label>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="group-title">复习统计</div>
+        <div class="stats-box" id="stats"></div>
+      </div>
+
+      <button class="danger-outline-btn" id="reset-progress">清空本设备刷题进度</button>
+    </aside>
+
+    <!-- 主答题区 -->
+    <main class="main" id="main-area">
+      <!-- 桌面端顶部栏 -->
+      <header class="desktop-topbar desktop-only">
+        <div class="crumb-text" id="crumb"></div>
+        <div class="desktop-top-tools">
+          <label class="model-picker">
+            <span>AI 模型:</span>
+            <select id="model-select"></select>
+          </label>
+          <button class="ghost-btn" id="jump-prev">上一题</button>
+          <button class="ghost-btn" id="jump-next">下一题</button>
+        </div>
+      </header>
+
+      <!-- 顶部轻量进度条 -->
+      <div class="top-progress-track"><div class="top-progress-fill" id="bar"></div></div>
+
+      <!-- 核心答题卡片 -->
+      <section class="card question-card" id="question-card">
+        <div class="card-header-meta">
+          <div class="tag-list">
+            <span class="tag-topic" id="tag-topic">Java基础</span>
+            <span class="tag-module" id="tag-module">核心语法</span>
+            <span class="tag-core" id="q-core-tag" style="display:none;">核心高频</span>
+          </div>
+          <span class="question-seq" id="q-meta">1/817</span>
+        </div>
+
+        <h2 class="question-title" id="q-title">加载题库中...</h2>
+
+        <!-- 答题与揭晓区域 -->
+        <div class="answer-container" id="answer-wrap">
+          <!-- 刷题模式未揭晓占位卡片 -->
+          <div class="practice-think-box" id="practice-think-box">
+            <div class="think-badge">🤔 先思考</div>
+            <p class="think-lead">试着在脑中组织 1~2 句核心要点，像在面试现场一样回答。</p>
+            <button class="action-reveal-btn" id="reveal-btn">💡 点击揭晓答案</button>
+            <span class="think-subtip">也可点击底栏「揭晓答案」或按键盘空格</span>
+          </div>
+
+          <!-- 详细答案内容 -->
+          <article class="answer-content" id="answer"></article>
+        </div>
+
+        <!-- 桌面端内嵌控制栏 -->
+        <div class="desktop-card-actions desktop-only">
+          <button id="btn-wrong" class="btn-state state-wrong">✕ 标记不会</button>
+          <button id="btn-star" class="btn-state state-star">★ 收藏</button>
+          <button id="btn-master" class="btn-state state-master">✓ 掌握</button>
+          <button id="btn-next" class="btn-primary">下一题 →</button>
+        </div>
+        <p class="keyboard-tip desktop-only">快捷键：← 上一题 · → 下一题 · 空格 揭晓 · 1 掌握 · 2 不会 · 3 收藏</p>
+      </section>
+    </main>
+
+    <!-- 移动端底部吸底栏 -->
+    <nav class="mobile-dock" id="mobile-bottom-bar">
+      <button class="dock-btn dock-wrong" id="m-btn-wrong">
+        <span class="dock-icon">✕</span>
+        <span class="dock-txt">不会</span>
+      </button>
+      <button class="dock-btn dock-star" id="m-btn-star">
+        <span class="dock-icon">★</span>
+        <span class="dock-txt">收藏</span>
+      </button>
+      <button class="dock-btn dock-master" id="m-btn-master">
+        <span class="dock-icon">✓</span>
+        <span class="dock-txt">掌握</span>
+      </button>
+      <button class="dock-primary-btn" id="m-btn-next">
+        <span id="m-next-label">下一题</span>
+        <span class="dock-arrow">→</span>
+      </button>
+    </nav>
+
+    <!-- AI 导师抽屉（移动端底部滑出，桌面端右侧常驻） -->
+    <aside class="ai-pane" id="ai-pane">
+      <div class="ai-sheet-grabber mobile-only"></div>
+      <div class="ai-pane-header">
+        <div class="ai-header-left">
+          <h3>🤖 AI 面试助教</h3>
+          <span class="ai-sub">多供应商聚合 · 本地 OpenCode</span>
+        </div>
+        <button class="close-icon-btn mobile-only" id="btn-close-ai" aria-label="关闭 AI 面板">✕</button>
+      </div>
+
+      <div class="ai-model-switch mobile-only">
+        <span>当前模型：</span>
+        <select id="m-model-select"></select>
+      </div>
+
+      <div class="ai-key-setting">
+        <div class="ai-key-row">
+          <input type="password" id="ai-key-input" placeholder="API Key（sk- 开头）" autocomplete="off" spellcheck="false">
+          <button type="button" id="ai-key-save">保存</button>
+          <button type="button" id="ai-key-clear" title="清除已保存的 Key">清除</button>
+        </div>
+        <div class="ai-key-status" id="ai-key-status">未配置 Key</div>
+      </div>
+
+      <div class="quick-prompts-row">
+        <button data-prompt="请按面试口语讲这道题：先怎么开口，再讲核心原理，最后给 2 个可能追问。">🗣️ 面试口语</button>
+        <button data-prompt="请用大白话把这道题讲懂：假设我是完全不懂的新手。禁止堆术语；每个术语第一次出现都先用生活例子解释；多用「打个比方」「你可以把它想成」；先讲它解决什么问题，再讲它怎么工作，最后用 3 句话总结。">💬 大白话讲懂</button>
+        <button data-prompt="把这题浓缩为 30 秒能背完的骨架口诀。">⚡ 30秒速记</button>
+        <button data-prompt="面试官顺着这道题接下来最可能追问什么？给我标准答法。">🎯 高频追问</button>
+        <button data-prompt="对照参考答案，指出这道题最容易踩坑或说错的雷区。">⚠️ 避坑防错</button>
+      </div>
+
+      <div id="chat" class="chat-stream-box"></div>
+
+      <form id="chat-form" class="chat-input-bar">
+        <textarea id="chat-input" rows="1" placeholder="追问这道题细节...（如：源码底层怎么写的？）"></textarea>
+        <button type="submit" id="chat-send-btn">发送</button>
+      </form>
+    </aside>
+  </div>
+
+  <div class="login-overlay" id="login-overlay" hidden>
+    <form class="login-card" id="login-form">
+      <h2>🔒 访问口令</h2>
+      <p>请输入访问口令继续</p>
+      <input type="password" id="login-password" placeholder="口令" autocomplete="current-password">
+      <div class="login-err" id="login-err" hidden>口令错误，请重试</div>
+      <button type="submit">进入</button>
+    </form>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
