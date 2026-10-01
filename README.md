@@ -45,7 +45,7 @@ python server.py
 - **刷题**：先看题，按空格或点「显示答案」再揭晓
 - **背题**：直接出答案
 - **不会 / 掌握 / 收藏**：进度存 `data/progress.json`，下次可筛
-- **AI 讲解**：口语讲解、30 秒速记、追问；模型列表和 Key 从 `~/.config/opencode/opencode.json`（路径可在 `config.json` 的 `ai.opencodeConfig` 改）读取，也可在 `config.json` 的 `ai.providers` 里显式声明
+- **AI 讲解**：口语讲解、30 秒速记、追问；打开 AI 助教后填写 OpenAI 兼容接口地址和 Key，前端会请求该接口的 `/models`，模型下拉框使用接口返回的实时列表。也可以在 `opencode.json` / `config.json` 中配置服务器兜底地址；项目不会默认选择某个供应商
 
 `config.json` 可加 `"password"` 给整个站套一层访问口令（局域网共享时建议设置）。
 

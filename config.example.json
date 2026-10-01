@@ -6,12 +6,8 @@
   "ai": {
     "opencodeConfig": "C:\\Users\\<you>\\.config\\opencode\\opencode.json",
     "provider": "a6",
-    "baseURL": "https://api.a6api.com/v1",
+    "baseURL": "",
     "apiKey": "",
-    "models": [
-      "DeepSeek-V4-Flash-0731",
-      "kimi-k3",
-      "glm-5.3"
-    ]
+    "models": []
   }
 }

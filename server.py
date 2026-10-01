@@ -81,13 +81,14 @@ def load_ai_from_opencode(cfg: dict) -> dict:
 
     # Explicit providers list from config: [{"key": "a6:xxx", "baseURL": ..., "model": ...}]
     # No apiKey anywhere — the browser supplies its own key from localStorage.
-    explicit = [p for p in (ai.get("providers") or []) if isinstance(p, dict) and p.get("baseURL") and p.get("model")]
+    explicit = [p for p in (ai.get("providers") or []) if isinstance(p, dict) and p.get("baseURL")]
     if explicit:
         registry = {}
         for p in explicit:
-            registry[str(p["key"])] = {
+            key = str(p.get("key") or p.get("name") or "discover")
+            registry[key] = {
                 "baseURL": str(p["baseURL"]).rstrip("/"),
-                "model": str(p["model"]),
+                "model": str(p.get("model") or ""),
             }
         ai["registry"] = registry
         ai["models"] = list(registry.keys())
@@ -128,16 +129,16 @@ def load_ai_from_opencode(cfg: dict) -> dict:
     if not ai.get("apiKey"):
         ai["apiKey"] = options.get("apiKey") or ""
     if not ai.get("baseURL"):
-        ai["baseURL"] = options.get("baseURL") or "https://api.a6api.com/v1"
+        ai["baseURL"] = options.get("baseURL") or ""
     models = list((block.get("models") or {}).keys())
     if models and not ai.get("models"):
         ai["models"] = models
     if models and (not ai.get("model") or ai["model"] not in models):
         ai["model"] = models[0]
 
-    ai.setdefault("baseURL", "https://api.a6api.com/v1")
-    ai.setdefault("model", "DeepSeek-V4-Flash-0731")
-    ai.setdefault("models", [ai["model"]])
+    ai.setdefault("baseURL", "")
+    ai.setdefault("model", "")
+    ai.setdefault("models", [])
 
     # Ensure default single-provider entry exists in registry
     default_key = f"{provider_name}:{ai.get('model')}"
@@ -147,7 +148,7 @@ def load_ai_from_opencode(cfg: dict) -> dict:
             default_key = next(iter(registry))
         ai["model"] = default_key
         ai["models"] = list(registry.keys())
-    else:
+    elif ai.get("model"):
         registry[default_key] = {"baseURL": ai["baseURL"], "apiKey": ai["apiKey"], "model": ai["model"]}
         ai["model"] = default_key
         ai["models"] = [default_key]
@@ -363,6 +364,14 @@ def merge_progress_item(old: dict, patch: dict) -> dict:
         item["lastSeen"] = patch.get("lastSeen") or item.get("lastSeen")
     if "note" in patch:
         item["note"] = patch["note"]
+    if "answerAttempts" in patch and isinstance(patch["answerAttempts"], list):
+        item["answerAttempts"] = patch["answerAttempts"][-20:]
+    for key in ("nextReviewAt", "reviewLevel"):
+        if key in patch:
+            try:
+                item[key] = int(patch[key])
+            except (TypeError, ValueError):
+                pass
     return item
 
 
@@ -515,10 +524,16 @@ class Handler(SimpleHTTPRequestHandler):
                 {"key": k, "baseURL": v.get("baseURL"), "model": v.get("model")}
                 for k, v in registry.items()
             ]
+            if not providers and STATE["ai"].get("baseURL"):
+                providers = [{
+                    "key": "discover",
+                    "baseURL": STATE["ai"]["baseURL"],
+                    "model": "",
+                }]
             self._json(200, {
                 "topics": STATE["topics"],
                 "total": len(STATE["questions"]),
-                "models": STATE["ai"].get("models") or [],
+                "models": [p["key"] for p in providers],
                 "model": STATE["ai"].get("model"),
                 "providers": providers,
                 "aiReady": bool(providers),

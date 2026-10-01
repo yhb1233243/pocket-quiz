@@ -12,3 +12,6 @@ bank/obsidian/
 
 # 本地截图
 mobile_*.png
+
+# Playwright 调试产物
+.playwright-mcp/

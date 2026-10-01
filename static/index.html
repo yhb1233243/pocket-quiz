@@ -79,12 +79,51 @@
             <option value="mastered">✓ 已掌握</option>
             <option value="starred">★ 收藏题目</option>
             <option value="core">🔥 核心必背题</option>
+            <option value="due">📅 今天待复习</option>
           </select>
         </label>
         <label class="check-item">
           <input type="checkbox" id="shuffle">
           <span>随机乱序出题</span>
         </label>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="group-title">大模型</div>
+        <label class="field-item">
+          <span class="field-label">对话模型</span>
+          <select id="model-select"></select>
+        </label>
+        <select id="m-model-select" hidden></select>
+        <div class="ai-key-setting" id="ai-key-setting">
+          <div class="ai-key-row">
+            <input type="text" id="ai-base-input" placeholder="接口地址（选填，留空用服务器配置）" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="ai-key-row">
+            <input type="password" id="ai-key-input" placeholder="API Key（sk- 开头）" autocomplete="off" spellcheck="false">
+            <button type="button" id="ai-key-save">保存</button>
+            <button type="button" id="ai-key-clear" title="清除已保存的 Key">清除</button>
+          </div>
+          <div class="ai-key-status" id="ai-key-status">未配置 Key</div>
+        </div>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="group-title">语音模型</div>
+        <div class="ai-key-setting">
+          <div class="ai-key-row">
+            <input type="text" id="ai-speech-base-input" placeholder="语音接口地址（留空用上方大模型）" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="ai-key-row">
+            <input type="text" id="ai-speech-model-input" placeholder="转写模型，默认 qwen3-asr-flash" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="ai-key-row">
+            <input type="password" id="ai-speech-key-input" placeholder="语音 API Key（留空用上方）" autocomplete="off" spellcheck="false">
+            <button type="button" id="ai-speech-save">保存</button>
+            <button type="button" id="ai-speech-clear" title="清除语音配置">清除</button>
+          </div>
+          <div class="ai-key-status" id="ai-speech-status">留空则转写使用上方大模型的地址和 Key</div>
+        </div>
       </div>
 
       <div class="sidebar-group">
@@ -101,10 +140,7 @@
       <header class="desktop-topbar desktop-only">
         <div class="crumb-text" id="crumb"></div>
         <div class="desktop-top-tools">
-          <label class="model-picker">
-            <span>AI 模型:</span>
-            <select id="model-select"></select>
-          </label>
+          <button class="ghost-btn" id="btn-open-ai-desktop" type="button">🤖 AI 助教</button>
           <button class="ghost-btn" id="jump-prev">上一题</button>
           <button class="ghost-btn" id="jump-next">下一题</button>
         </div>
@@ -128,6 +164,25 @@
 
         <!-- 答题与揭晓区域 -->
         <div class="answer-container" id="answer-wrap">
+          <div class="oral-answer-box" id="oral-answer-box">
+            <div class="oral-answer-head">
+              <div>
+                <div class="k">🎙️ 口头作答</div>
+                <div class="oral-answer-tip">先用自己的话回答，再让 AI 指出遗漏和表达问题。</div>
+              </div>
+              <span class="record-time" id="record-time"></span>
+            </div>
+            <div class="oral-answer-actions">
+              <button type="button" class="record-btn" id="record-btn">🎙 开始录音</button>
+              <span class="record-status" id="record-status">最多 3 分钟，不保存原始音频</span>
+            </div>
+            <textarea id="answer-transcript" class="answer-transcript" rows="5" placeholder="录音转写结果会出现在这里，也可以直接输入或修改…"></textarea>
+            <div class="transcript-actions">
+              <button type="button" class="ghost-btn" id="clear-transcript">清空</button>
+              <button type="button" class="btn-primary" id="evaluate-answer">提交 AI 评价</button>
+            </div>
+            <div class="answer-feedback" id="answer-feedback" hidden></div>
+          </div>
           <!-- 刷题模式未揭晓占位卡片 -->
           <div class="practice-think-box" id="practice-think-box">
             <div class="think-badge">🤔 先思考</div>
@@ -179,21 +234,7 @@
           <h3>🤖 AI 面试助教</h3>
           <span class="ai-sub">多供应商聚合 · 本地 OpenCode</span>
         </div>
-        <button class="close-icon-btn mobile-only" id="btn-close-ai" aria-label="关闭 AI 面板">✕</button>
-      </div>
-
-      <div class="ai-model-switch mobile-only">
-        <span>当前模型：</span>
-        <select id="m-model-select"></select>
-      </div>
-
-      <div class="ai-key-setting">
-        <div class="ai-key-row">
-          <input type="password" id="ai-key-input" placeholder="API Key（sk- 开头）" autocomplete="off" spellcheck="false">
-          <button type="button" id="ai-key-save">保存</button>
-          <button type="button" id="ai-key-clear" title="清除已保存的 Key">清除</button>
-        </div>
-        <div class="ai-key-status" id="ai-key-status">未配置 Key</div>
+        <button class="close-icon-btn" id="btn-close-ai" aria-label="关闭 AI 助教">✕</button>
       </div>
 
       <div class="quick-prompts-row">
@@ -202,6 +243,7 @@
         <button data-prompt="把这题浓缩为 30 秒能背完的骨架口诀。">⚡ 30秒速记</button>
         <button data-prompt="面试官顺着这道题接下来最可能追问什么？给我标准答法。">🎯 高频追问</button>
         <button data-prompt="对照参考答案，指出这道题最容易踩坑或说错的雷区。">⚠️ 避坑防错</button>
+        <button type="button" id="scene-explain">🗺️ 答案地图</button>
       </div>
 
       <div id="chat" class="chat-stream-box"></div>

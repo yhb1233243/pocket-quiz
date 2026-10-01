@@ -1,6 +1,10 @@
 const $ = (id) => document.getElementById(id);
 
 const AI_KEY_STORE = "quiz-ai-key-v1";
+const AI_BASE_STORE = "quiz-ai-base-v1";
+const AI_SPEECH_STORE = "quiz-ai-speech-v1";
+const AI_SPEECH_BASE_STORE = "quiz-ai-speech-base-v1";
+const AI_SPEECH_KEY_STORE = "quiz-ai-speech-key-v1";
 
 const state = {
   topics: [],
@@ -13,6 +17,11 @@ const state = {
   chat: [],
   model: "",
   providers: [],
+  recorder: null,
+  recordChunks: [],
+  recordStartedAt: 0,
+  recordTimer: null,
+  evaluating: false,
 };
 
 function escapeHtml(text) {
@@ -138,12 +147,19 @@ function filtered() {
     if (f === "mastered") return !!r.mastered;
     if (f === "starred") return !!r.starred;
     if (f === "core") return !!q.starred_src;
+    if (f === "due") return dueReview(r);
     return true;
   });
 }
 
+function dueReview(item) {
+  const at = Number(item.nextReviewAt || 0);
+  return at > 0 && at <= Date.now();
+}
+
 function renderStats() {
   const all = state.list;
+  const due = all.filter((q) => dueReview(rec(q.id))).length;
   const seen = all.filter((q) => rec(q.id).seen).length;
   const mastered = all.filter((q) => rec(q.id).mastered).length;
   const wrong = all.filter((q) => rec(q.id).wrong).length;
@@ -152,6 +168,7 @@ function renderStats() {
     <div>范围总题数：<b>${all.length}</b></div>
     <div>已看：<b>${seen}</b> · 掌握：<b>${mastered}</b></div>
     <div>不会/错题：<b>${wrong}</b> · 收藏：<b>${starred}</b></div>
+    <div>今天待复习：<b>${due}</b></div>
   `;
 }
 
@@ -246,6 +263,8 @@ async function show(i) {
   state.revealed = state.mode === "memorize" || !!rec(q.id).revealed;
   state.chat = [];
   $("chat").innerHTML = "";
+  stopScenePlayback();
+  resetAnswerPanel();
 
   // 题目与元信息
   $("q-title").textContent = q.title;
@@ -391,6 +410,10 @@ function aiApiKey() {
   return localStorage.getItem(AI_KEY_STORE) || "";
 }
 
+function aiBaseUrl() {
+  return (localStorage.getItem(AI_BASE_STORE) || "").trim().replace(/\/+$/, "");
+}
+
 function updateKeyUI(kind, text) {
   const el = $("ai-key-status");
   el.classList.toggle("ok", kind === "ok");
@@ -406,7 +429,318 @@ function updateKeyUI(kind, text) {
   }
 }
 
-function saveApiKey() {
+function aiSpeechModel() {
+  return (localStorage.getItem(AI_SPEECH_STORE) || "qwen3-asr-flash").trim();
+}
+
+function aiSpeechBaseUrl() {
+  return (localStorage.getItem(AI_SPEECH_BASE_STORE) || "").trim().replace(/\/+$/, "");
+}
+
+function aiSpeechKey() {
+  return localStorage.getItem(AI_SPEECH_KEY_STORE) || "";
+}
+
+function speechAuth() {
+  return {
+    key: aiSpeechKey() || aiApiKey(),
+    base: aiSpeechBaseUrl() || effectiveBaseURL(providerForModel()),
+  };
+}
+
+function updateSpeechUI() {
+  const el = $("ai-speech-status");
+  const key = aiSpeechKey();
+  el.classList.toggle("ok", !!key);
+  el.classList.toggle("err", false);
+  if (key) {
+    el.textContent = `语音 Key 已保存：${key.slice(0, 7)}…${key.slice(-4)}`;
+    $("ai-speech-key-input").placeholder = "已配置（输入新值可覆盖）";
+  } else {
+    el.textContent = "留空则转写使用上方大模型的地址和 Key";
+    $("ai-speech-key-input").placeholder = "语音 API Key（留空用上方）";
+  }
+}
+
+function saveSpeechConfig() {
+  const model = ($("ai-speech-model-input").value || "").trim();
+  if (model) localStorage.setItem(AI_SPEECH_STORE, model);
+  else localStorage.removeItem(AI_SPEECH_STORE);
+  const base = ($("ai-speech-base-input").value || "").trim().replace(/\/+$/, "");
+  if (base) localStorage.setItem(AI_SPEECH_BASE_STORE, base);
+  else localStorage.removeItem(AI_SPEECH_BASE_STORE);
+  const key = ($("ai-speech-key-input").value || "").trim().replace(/^["'`\s]+|["'`\s]+$/g, "");
+  if (key) {
+    localStorage.setItem(AI_SPEECH_KEY_STORE, key);
+    $("ai-speech-key-input").value = "";
+  }
+  updateSpeechUI();
+}
+
+function clearSpeechConfig() {
+  localStorage.removeItem(AI_SPEECH_STORE);
+  localStorage.removeItem(AI_SPEECH_BASE_STORE);
+  localStorage.removeItem(AI_SPEECH_KEY_STORE);
+  $("ai-speech-model-input").value = "";
+  $("ai-speech-base-input").value = "";
+  $("ai-speech-key-input").value = "";
+  updateSpeechUI();
+}
+
+function setRecordStatus(text, error = false) {
+  const el = $("record-status");
+  el.textContent = text;
+  el.classList.toggle("err", error);
+}
+
+function resetAnswerPanel() {
+  stopRecording(true);
+  $("answer-transcript").value = "";
+  $("answer-feedback").hidden = true;
+  $("answer-feedback").innerHTML = "";
+  $("record-time").textContent = "";
+  setRecordStatus("最多 3 分钟，不保存原始音频");
+  $("evaluate-answer").disabled = false;
+}
+
+function recordingMimeType() {
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  return types.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "";
+}
+
+function updateRecordClock() {
+  if (!state.recordStartedAt) return;
+  const seconds = Math.floor((Date.now() - state.recordStartedAt) / 1000);
+  $("record-time").textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+async function toggleRecording() {
+  if (state.recorder) {
+    state.recorder.stop();
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    setRecordStatus("当前浏览器不支持录音，请直接输入文字", true);
+    return;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = recordingMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    state.recorder = recorder;
+    state.recordChunks = [];
+    state.discardRecording = false;
+    state.recordStartedAt = Date.now();
+    $("record-btn").textContent = "⏹ 结束录音";
+    $("record-btn").classList.add("recording");
+    setRecordStatus("正在录音…再次点击结束");
+    state.recordTimer = setInterval(updateRecordClock, 250);
+    recorder.ondataavailable = (event) => { if (event.data.size) state.recordChunks.push(event.data); };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      clearInterval(state.recordTimer);
+      state.recordTimer = null;
+      state.recorder = null;
+      $("record-btn").textContent = "🎙 开始录音";
+      $("record-btn").classList.remove("recording");
+      const discard = state.discardRecording;
+      const blob = new Blob(state.recordChunks, { type: recorder.mimeType || "audio/webm" });
+      state.recordChunks = [];
+      state.discardRecording = false;
+      state.recordStartedAt = 0;
+      if (discard) return;
+      if (!blob.size) return setRecordStatus("没有录到声音，请重试", true);
+      await transcribeAudio(blob);
+    };
+    recorder.onerror = () => setRecordStatus("录音失败，请检查麦克风权限", true);
+    recorder.start();
+    setTimeout(() => { if (state.recorder === recorder) recorder.stop(); }, 180000);
+  } catch (error) {
+    setRecordStatus("无法使用麦克风：请允许浏览器访问麦克风", true);
+  }
+}
+
+function stopRecording(silent = false) {
+  if (!state.recorder) return;
+  if (silent) state.discardRecording = true;
+  state.recorder.stop();
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function responseText(data) {
+  const content = data?.choices?.[0]?.message?.content ?? data?.output?.text ?? data?.output?.output?.sentence?.text ?? "";
+  if (Array.isArray(content)) return content.map((part) => part.text || part.content || "").join("");
+  return String(content || "").trim();
+}
+
+async function transcribeAudio(blob) {
+  const { key, base } = speechAuth();
+  if (!key || !base) {
+    setRecordStatus("请先保存语音或大模型的接口地址和 API Key", true);
+    return;
+  }
+  setRecordStatus("正在调用阿里语音模型转写…");
+  try {
+    const dataUrl = await blobToDataUrl(blob);
+    const res = await fetch(base + "/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + key, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: aiSpeechModel(),
+        messages: [{ role: "user", content: [{ type: "input_audio", input_audio: { data: dataUrl } }] }],
+        stream: false,
+        asr_options: { language: "zh", enable_itn: false },
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error?.message || data.message || `HTTP ${res.status}`);
+    const text = responseText(data);
+    if (!text) throw new Error("语音模型没有返回文字");
+    $("answer-transcript").value = text;
+    setRecordStatus("转写完成，可以修改文字后提交评价");
+  } catch (error) {
+    setRecordStatus(`转写失败：${error.message}`, true);
+  }
+}
+
+function parseJsonResponse(text) {
+  const cleaned = String(text || "").replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  try { return JSON.parse(cleaned); } catch {}
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  try { return match ? JSON.parse(match[0]) : null; } catch { return null; }
+}
+
+function feedbackHtml(feedback, raw) {
+  if (!feedback) return `<div class="feedback-raw">${md(raw || "AI 没有返回有效评价")}</div>`;
+  const list = (items) => Array.isArray(items) && items.length ? `<ul>${items.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>` : "<p>暂无</p>";
+  return `<div class="feedback-summary"><b>本次判断：${escapeHtml(feedback.result || "部分掌握")}</b>${feedback.score != null ? ` · ${escapeHtml(feedback.score)}/100` : ""}</div>` +
+    `<div class="feedback-grid"><div><b>说得好的地方</b>${list(feedback.covered)}</div><div><b>需要补充</b>${list(feedback.missing)}</div><div><b>技术问题</b>${list(feedback.incorrect)}</div><div><b>表达问题</b>${list(feedback.expression)}</div></div>` +
+    `<div class="feedback-next"><b>下一次练习：</b>${escapeHtml(feedback.nextAction || "重新回答一次，先说结论再补原理")}</div>` +
+    `<div class="feedback-result-actions"><button data-answer-result="mastered">✓ 掌握</button><button data-answer-result="partial">△ 部分掌握</button><button data-answer-result="wrong">✕ 还不会</button></div>`;
+}
+
+async function evaluateAnswer() {
+  const answer = $("answer-transcript").value.trim();
+  if (!answer || !state.current || state.evaluating) return;
+  if (!aiApiKey()) { toggleAI(true); updateKeyUI("err", "请先保存 API Key"); return; }
+  const prov = providerForModel();
+  const base = effectiveBaseURL(prov);
+  if (!base) { setRecordStatus("请先填写接口地址并保存", true); return; }
+  state.evaluating = true;
+  $("evaluate-answer").disabled = true;
+  $("answer-feedback").hidden = false;
+  $("answer-feedback").innerHTML = "<p>AI 正在评价你的回答…</p>";
+  if (!state.revealed) reveal();
+  const q = state.current;
+  const prompt = `请评价下面这次面试回答，只返回 JSON，不要 Markdown 代码块。JSON 字段必须是 result（mastered/partial/wrong）、score（0-100）、covered（字符串数组）、missing（字符串数组）、incorrect（字符串数组）、expression（字符串数组）、nextAction（字符串）。不要因为措辞不同而扣分，重点检查技术准确性、关键点覆盖和面试表达。\n题目：${q.title}\n参考答案：${(q.answer || "").slice(0, 6000)}\n用户回答：${answer}`;
+  try {
+    const res = await fetch(base + "/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + aiApiKey(), "Content-Type": "application/json" },
+      body: JSON.stringify({ model: prov?.model || prov?.key || state.model, messages: [{ role: "user", content: prompt }], stream: false, temperature: 0.2 }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error?.message || data.message || `HTTP ${res.status}`);
+    const raw = responseText(data);
+    const feedback = parseJsonResponse(raw);
+    $("answer-feedback").innerHTML = feedbackHtml(feedback, raw);
+    const attempts = (rec(q.id).answerAttempts || []).slice();
+    attempts.push({ createdAt: Date.now(), answer, result: feedback?.result || "partial", feedback: feedback || { raw } });
+    await saveProgress({ question: { id: q.id, answerAttempts: attempts } });
+  } catch (error) {
+    $("answer-feedback").innerHTML = `<p class="feedback-error">评价失败：${escapeHtml(error.message)}</p>`;
+  } finally {
+    state.evaluating = false;
+    $("evaluate-answer").disabled = false;
+  }
+}
+
+async function saveAnswerResult(result) {
+  if (!state.current) return;
+  const qid = state.current.id;
+  const item = rec(qid);
+  const attempts = (item.answerAttempts || []).slice();
+  if (!attempts.length) return;
+  const last = { ...attempts[attempts.length - 1], result };
+  attempts[attempts.length - 1] = last;
+  const level = Number(item.reviewLevel || 0);
+  const nextLevel = result === "mastered" ? Math.min(level + 1, 4) : result === "partial" ? level : 0;
+  const days = [0, 1, 3, 7, 14][nextLevel];
+  await saveProgress({ question: { id: qid, answerAttempts: attempts, reviewLevel: nextLevel, nextReviewAt: Date.now() + days * 86400000, mastered: result === "mastered", wrong: result === "wrong" } });
+  $("answer-feedback").querySelectorAll("[data-answer-result]").forEach((button) => button.disabled = true);
+  setRecordStatus(`已记录：${result === "mastered" ? "掌握" : result === "partial" ? "部分掌握" : "还不会"}，${days ? `${days} 天后复习` : "今天再练一次"}`);
+  updateButtonStates(qid);
+  renderStats();
+}
+
+function providerForModel(model = state.model) {
+  return state.providers.find((p) => p.key === model) || state.providers[0] || null;
+}
+
+function effectiveBaseURL(prov = providerForModel()) {
+  return aiBaseUrl() || (prov && prov.baseURL) || "";
+}
+
+function renderModelOptions() {
+  for (const id of ["model-select", "m-model-select"]) {
+    const select = $(id);
+    select.replaceChildren(...state.providers.map((p) => {
+      const option = document.createElement("option");
+      option.value = p.key;
+      option.textContent = p.key;
+      option.selected = p.key === state.model;
+      return option;
+    }));
+  }
+  const ready = state.providers.filter((p) => p.model).length;
+  $("ai-status").textContent = ready
+    ? `✅ ${ready} 个模型`
+    : "⏳ 保存 Key 后获取模型列表";
+}
+
+function normalizeModelList(payload) {
+  const list = Array.isArray(payload) ? payload : payload?.data || payload?.models || payload?.result || [];
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.map((item) => {
+    if (typeof item === "string") return item.trim();
+    if (!item || typeof item !== "object") return "";
+    return String(item.id || item.name || item.model || "").trim();
+  }).filter(Boolean))];
+}
+
+async function refreshModelsFromApi(showStatus = false, preferredModel = state.model) {
+  const key = aiApiKey();
+  const base = aiBaseUrl() || providerForModel()?.baseURL;
+  if (!key || !base) return false;
+  if (showStatus) updateKeyUI("none", "正在获取模型列表…");
+  try {
+    const res = await fetch(base.replace(/\/$/, "") + "/models", {
+      headers: { "Authorization": "Bearer " + key },
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const models = normalizeModelList(await res.json());
+    if (!models.length) throw new Error("接口没有返回模型");
+    state.providers = models.map((model) => ({ key: model, model, baseURL: base }));
+    state.model = models.includes(preferredModel) ? preferredModel : models[0];
+    renderModelOptions();
+    await saveProgress({ session: { model: state.model } });
+    if (showStatus) updateKeyUI("ok", `✅ Key 有效，已获取 ${models.length} 个模型`);
+    return true;
+  } catch (e) {
+    if (showStatus) updateKeyUI("err", `❌ 模型列表获取失败：${e.message}`);
+    return false;
+  }
+}
+
+async function saveApiKey() {
   const val = ($("ai-key-input").value || "").trim();
   if (!val) {
     updateKeyUI("err", "输入为空。请粘贴 sk- 开头的完整 Key");
@@ -419,12 +753,18 @@ function saveApiKey() {
   }
   localStorage.setItem(AI_KEY_STORE, clean);
   $("ai-key-input").value = "";
+  const baseVal = ($("ai-base-input").value || "").trim().replace(/\/+$/, "");
+  if (baseVal) localStorage.setItem(AI_BASE_STORE, baseVal);
+  else localStorage.removeItem(AI_BASE_STORE);
   updateKeyUI();
+  await refreshModelsFromApi(true);
 }
 
 function clearApiKey() {
   localStorage.removeItem(AI_KEY_STORE);
+  localStorage.removeItem(AI_BASE_STORE);
   $("ai-key-input").value = "";
+  $("ai-base-input").value = "";
   $("ai-key-input").placeholder = "API Key（sk- 开头）";
   updateKeyUI();
 }
@@ -436,18 +776,218 @@ async function testApiKey() {
     return;
   }
   updateKeyUI("none", "测试中…");
-  const prov = state.providers.find((p) => p.key === state.model) || state.providers[0];
+  const prov = providerForModel();
   if (!prov) {
     updateKeyUI("err", "没有可用模型");
     return;
   }
   try {
-    const res = await fetch(prov.baseURL + "/models", { headers: { "Authorization": "Bearer " + key } });
-    if (res.ok) updateKeyUI("ok", `✅ Key 有效（${prov.key} 可用）`);
-    else if (res.status === 401) updateKeyUI("err", "❌ Key 无效或已过期（401）");
-    else updateKeyUI("err", `❌ HTTP ${res.status}，可能是网络或供应商问题`);
+    await refreshModelsFromApi(true);
   } catch (e) {
     updateKeyUI("err", "❌ 网络错误，请检查本机能否访问外网");
+  }
+}
+
+let sceneToken = 0;
+let sceneOwner = 0;
+let sceneTimer = null;
+let sceneBusy = false;
+
+function stopScenePlayback() {
+  sceneOwner = 0;
+  clearTimeout(sceneTimer);
+  sceneTimer = null;
+}
+
+function scenePrompt(q) {
+  const attempt = rec(q.id).answerAttempts?.slice(-1)[0];
+  const feedback = attempt?.feedback || {};
+  return `你是 Java 面试教练。请把这道题整理成“答案地图”，帮助用户理解机制并在面试中复述。只返回 JSON，不要 Markdown、代码块或额外文字。
+输出格式：
+{"type":"process|compare|structure|answer","takeaway":"一句话结论","skeleton":["3到5个答题要点"],"nodes":[{"id":"a","label":"节点名"}],"comparisons":[{"left":"概念A","right":"概念B","difference":"关键区别"}],"steps":[{"title":"步骤名","what":"发生了什么","why":"为什么","condition":"关键条件或例外","visible":["a"],"arrows":[{"from":"a","to":"b","label":"条件"}],"focus":["a"]}],"pitfalls":["易错点"],"followups":[{"question":"追问","answer":"答法"}],"checkQuestion":"自测问题","checkAnswer":"自测答案"}
+规则：
+1. type 按题目选择：流程用 process，横向区别用 compare，状态/结构变化用 structure，行为题或不适合画图用 answer。
+2. 流程/结构题 nodes 放全程复用的 2 到 8 个稳定节点；对比题和行为题 nodes 可为空。id 只用小写字母和数字，label 不超过 12 个汉字。每一步 visible 只写当前出现的节点 id，不能改节点含义。
+3. steps 输出 3 到 6 步，每步必须有 title、what、why、condition；what 说明发生了什么，why 说明设计原因，condition 只在确有条件或例外时填写。
+4. compare 题必须输出 2 到 4 组 comparisons，每组包含 left、right、difference；不适合画图时不要生成 nodes 或箭头。箭头只表达真实关系或先后顺序，不要为了凑图添加箭头。不要发明参考资料中没有的事实。
+5. skeleton 是用户可以直接复述的答题骨架；pitfalls 写最容易说错的点；followups 写 2 个高频追问；checkQuestion 只能检查一个关键条件。
+6. 这是面试学习卡，不是装饰性动画。优先保留“为什么、条件、例外、复杂度、输入输出”等信息；不适合画图时仍要输出高质量 answer map，nodes 可以是空数组。
+题目：${q.title}
+面试口语版：${(q.oral || "（无）").slice(0, 1800)}
+原理说明：${(q.reason || "（无）").slice(0, 2200)}
+易错点与追问：${(q.pit || "（无）").slice(0, 1800)}
+完整参考答案：${(q.answer || "").slice(0, 5000)}
+${attempt?.answer ? `用户最近一次回答：${attempt.answer.slice(0, 2200)}` : "用户还没有提交回答。"}
+${feedback.missing?.length ? `这次回答遗漏：${feedback.missing.join("；")}` : ""}
+${feedback.incorrect?.length ? `这次回答可能有误：${feedback.incorrect.join("；")}` : ""}`;
+}
+
+function normalizeScene(data) {
+  const cleanId = (id) => String(id || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+  const nodeMap = new Map();
+  const addNode = (node) => {
+    const id = cleanId(typeof node === "string" ? node : node?.id);
+    const label = String(typeof node === "string" ? node : node?.label || node?.text || "").trim().slice(0, 12);
+    if (id && label && !nodeMap.has(id)) nodeMap.set(id, { id, label });
+    return id;
+  };
+  (Array.isArray(data?.nodes) ? data.nodes : Array.isArray(data?.entities) ? data.entities : []).slice(0, 8).forEach(addNode);
+  const rawSteps = Array.isArray(data?.steps) ? data.steps.slice(0, 6) : [];
+  rawSteps.forEach((step) => (Array.isArray(step.nodes) ? step.nodes : []).forEach(addNode));
+  const nodes = [...nodeMap.values()].slice(0, 8);
+  const ids = new Set(nodes.map((node) => node.id));
+  const clean = rawSteps.map((step) => {
+    const rawVisible = Array.isArray(step.visible) ? step.visible : Array.isArray(step.nodes) ? step.nodes : nodes.map((node) => node.id);
+    const visible = rawVisible.map((node) => cleanId(typeof node === "string" ? node : node?.id)).filter((id) => ids.has(id));
+    const rawArrows = Array.isArray(step.arrows) ? step.arrows : Array.isArray(step.edges) ? step.edges : [];
+    const arrows = rawArrows.map((arrow) => ({
+      from: cleanId(arrow.from),
+      to: cleanId(arrow.to),
+      label: String(arrow.label || "").trim().slice(0, 10),
+    })).filter((arrow) => ids.has(arrow.from) && ids.has(arrow.to) && arrow.from !== arrow.to && visible.includes(arrow.from) && visible.includes(arrow.to));
+    const rawFocus = Array.isArray(step.focus) ? step.focus : Array.isArray(step.highlight) ? step.highlight : [];
+    const focus = rawFocus.map(cleanId).filter((id) => ids.has(id) && visible.includes(id));
+    return {
+      title: String(step.title || step.say || step.caption || "分步讲解").trim().slice(0, 28),
+      what: String(step.what || step.say || "").trim().slice(0, 110),
+      why: String(step.why || "").trim().slice(0, 110),
+      condition: String(step.condition || "").trim().slice(0, 90),
+      visible: [...new Set(visible)], arrows, focus,
+    };
+  }).filter((step) => step.what && (!nodes.length || step.visible.length >= 1));
+  if (clean.length < 2) return null;
+  return {
+    type: ["process", "compare", "structure", "answer"].includes(data?.type) ? data.type : "process",
+    takeaway: String(data?.takeaway || "").trim().slice(0, 180),
+    skeleton: Array.isArray(data?.skeleton) ? data.skeleton.map((x) => String(x).trim().slice(0, 100)).filter(Boolean).slice(0, 5) : [],
+    comparisons: Array.isArray(data?.comparisons) ? data.comparisons.map((x) => ({ left: String(x?.left || "").trim().slice(0, 80), right: String(x?.right || "").trim().slice(0, 80), difference: String(x?.difference || "").trim().slice(0, 160) })).filter((x) => x.left && x.right && x.difference).slice(0, 4) : [],
+    nodes, steps: clean,
+    pitfalls: Array.isArray(data?.pitfalls) ? data.pitfalls.map((x) => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 4) : [],
+    followups: Array.isArray(data?.followups) ? data.followups.map((x) => ({ question: String(x?.question || "").trim().slice(0, 100), answer: String(x?.answer || "").trim().slice(0, 160) })).filter((x) => x.question && x.answer).slice(0, 3) : [],
+    checkQuestion: String(data?.checkQuestion || "").trim().slice(0, 120),
+    checkAnswer: String(data?.checkAnswer || "").trim().slice(0, 180),
+  };
+}
+
+function mountScene(box, scene) {
+  const token = ++sceneToken;
+  let index = 0;
+  let playing = false;
+  const { nodes, steps } = scene;
+  const hasDiagram = nodes.length > 0 && ["process", "structure"].includes(scene.type);
+  const cols = Math.min(3, nodes.length || 1);
+  const rows = Math.max(1, Math.ceil(nodes.length / cols));
+  const pos = {};
+  nodes.forEach((node, i) => { pos[node.id] = { x: 16 + (i % cols) * 104, y: 16 + Math.floor(i / cols) * 72 }; });
+  const draw = () => {
+    const step = steps[index];
+    const condition = step.condition ? `<div class="scene-condition"><b>关键条件：</b>${escapeHtml(step.condition)}</div>` : "";
+    box.querySelector(".scene-title").textContent = `${index + 1}. ${step.title}`;
+    box.querySelector(".scene-what").textContent = step.what;
+    box.querySelector(".scene-why").textContent = step.why ? `为什么：${step.why}` : "";
+    box.querySelector(".scene-condition").outerHTML = condition || `<div class="scene-condition" hidden></div>`;
+    if (!hasDiagram) return;
+    const lines = step.arrows.map((arrow) => {
+      const a = pos[arrow.from];
+      const b = pos[arrow.to];
+      const x1 = a.x + 44;
+      const y1 = a.y + 20;
+      const x2 = b.x + 44;
+      const y2 = b.y + 20;
+      const label = arrow.label ? `<text class="scene-arrow-label" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 4}">${escapeHtml(arrow.label)}</text>` : "";
+      return `<line class="scene-arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#scene-arrow-${token})"/>${label}`;
+    }).join("");
+    const visible = new Set(step.visible);
+    const focus = new Set(step.focus.length ? step.focus : step.visible);
+    const nodeHtml = nodes.map((node) => {
+      const p = pos[node.id];
+      const shown = visible.has(node.id);
+      const on = focus.has(node.id);
+      return `<g class="scene-node${shown ? " visible" : ""}${on ? " on" : ""}"><rect x="${p.x}" y="${p.y}" width="88" height="40" rx="8"/><text x="${p.x + 44}" y="${p.y + 20}">${escapeHtml(node.label)}</text></g>`;
+    }).join("");
+    box.querySelector(".scene-stage").innerHTML = `<defs><marker id="scene-arrow-${token}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#93c5fd"/></marker></defs>${lines}${nodeHtml}`;
+    box.querySelector(".scene-play").textContent = playing ? "暂停" : "播放";
+    box.querySelector(".scene-count").textContent = `${index + 1}/${steps.length}`;
+  };
+  const schedule = () => {
+    clearTimeout(sceneTimer);
+    if (!playing || sceneOwner !== token) return;
+    sceneTimer = setTimeout(() => {
+      if (sceneOwner !== token || !playing) return;
+      index = (index + 1) % steps.length;
+      draw();
+      schedule();
+    }, 2400);
+  };
+  box.onclick = (event) => {
+    const action = event.target.closest("[data-scene]")?.dataset.scene;
+    if (!action) return;
+    if (action === "prev") index = (index + steps.length - 1) % steps.length;
+    if (action === "next") index = (index + 1) % steps.length;
+    if (action === "prev" || action === "next") playing = false;
+    if (action === "play") {
+      playing = !playing;
+      if (playing) sceneOwner = token;
+    }
+    draw();
+    schedule();
+  };
+  const summary = scene.takeaway ? `<div class="scene-takeaway"><b>一句话结论</b><p>${escapeHtml(scene.takeaway)}</p></div>` : "";
+  const skeleton = scene.skeleton.length ? `<div class="scene-skeleton"><b>面试答题骨架</b><ol>${scene.skeleton.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol></div>` : "";
+  const pitfalls = scene.pitfalls.length ? `<details class="scene-details"><summary>⚠️ 易错点</summary><ul>${scene.pitfalls.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></details>` : "";
+  const followups = scene.followups.length ? `<details class="scene-details"><summary>🎯 高频追问</summary>${scene.followups.map((item) => `<div class="scene-followup"><b>${escapeHtml(item.question)}</b><p>${escapeHtml(item.answer)}</p></div>`).join("")}</details>` : "";
+  const check = scene.checkQuestion ? `<div class="scene-details scene-check"><b>🧠 自测</b><p>${escapeHtml(scene.checkQuestion)}</p><details><summary>显示参考答案</summary><p class="scene-check-answer">${escapeHtml(scene.checkAnswer || "暂无答案")}</p></details></div>` : "";
+  const compare = scene.comparisons.length ? `<div class="scene-comparisons">${scene.comparisons.map((item) => `<div class="scene-compare"><div><b>${escapeHtml(item.left)}</b></div><div><b>${escapeHtml(item.right)}</b></div><p>${escapeHtml(item.difference)}</p></div>`).join("")}</div>` : "";
+  const diagram = hasDiagram ? `<svg class="scene-stage" viewBox="0 0 328 ${20 + rows * 72}" role="img" aria-label="答案地图"></svg><div class="scene-controls"><button type="button" data-scene="prev">上一步</button><button type="button" class="scene-play" data-scene="play">播放</button><button type="button" data-scene="next">下一步</button><span class="scene-count"></span></div>` : `<div class="scene-no-diagram">这道题更适合用答题骨架和追问练习，不强行画图。</div>`;
+  const stepsHtml = hasDiagram ? `<div class="scene-step"><div class="scene-title"></div><div class="scene-what"></div><div class="scene-why"></div><div class="scene-condition" hidden></div>${diagram}</div>` : `<div class="scene-text-steps">${steps.map((step, i) => `<article class="scene-step"><div class="scene-title">${i + 1}. ${escapeHtml(step.title)}</div><div class="scene-what">${escapeHtml(step.what)}</div>${step.why ? `<div class="scene-why">为什么：${escapeHtml(step.why)}</div>` : ""}${step.condition ? `<div class="scene-condition"><b>关键条件：</b>${escapeHtml(step.condition)}</div>` : ""}</article>`).join("")}</div>`;
+  box.innerHTML = `<div class="scene-player">${summary}${skeleton}${stepsHtml}${scene.type === "compare" ? compare : ""}${pitfalls}${followups}${check}</div>`;
+  if (hasDiagram) draw();
+}
+
+async function explainScene() {
+  if (!state.current || sceneBusy) return;
+  toggleAI(true);
+  if (!aiApiKey()) {
+    updateKeyUI("err", "请先在下方输入 API Key 并保存，然后再提问");
+    $("ai-key-input").focus();
+    return;
+  }
+  const activeModel = $("m-model-select").value || $("model-select").value || state.model;
+  const prov = state.providers.find((p) => p.key === activeModel) || providerForModel(activeModel);
+  const base = effectiveBaseURL(prov);
+  if (!base) {
+    updateKeyUI("err", "请先填写接口地址并保存");
+    return;
+  }
+  sceneBusy = true;
+  stopScenePlayback();
+  const q = state.current;
+   const ask = "生成这道题的答案地图";
+  addMsg("user", ask);
+  state.chat.push({ role: "user", content: ask });
+  const box = addMsg("assistant", "正在生成动态讲解…");
+  try {
+    const res = await fetch(base + "/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + aiApiKey(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: prov?.model || prov?.key || activeModel,
+        messages: [{ role: "user", content: scenePrompt(q) }],
+        stream: false,
+        temperature: 0.2,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error?.message || data.message || `HTTP ${res.status}`);
+     const scene = normalizeScene(parseJsonResponse(responseText(data)));
+     if (!scene) throw new Error("模型没有返回可播放的答案地图");
+     mountScene(box, scene);
+     state.chat.push({ role: "assistant", content: "答案地图：" + [scene.takeaway, ...scene.skeleton].filter(Boolean).join("；") });
+  } catch (error) {
+    box.classList.add("err");
+    box.textContent = "动态讲解失败：" + error.message;
+  } finally {
+    sceneBusy = false;
   }
 }
 
@@ -464,8 +1004,9 @@ async function askAI(message) {
   const history = state.chat.slice();
   state.chat.push({ role: "user", content: message });
   const activeModel = $("m-model-select").value || $("model-select").value || state.model;
-  const prov = state.providers.find((p) => p.key === activeModel) || state.providers[0];
-  if (!prov || !prov.baseURL) {
+  const prov = state.providers.find((p) => p.key === activeModel) || providerForModel(activeModel);
+  const base = effectiveBaseURL(prov);
+  if (!base) {
     box.classList.add("err");
     box.textContent = "没有可用模型，请刷新页面重试";
     return;
@@ -492,16 +1033,17 @@ async function askAI(message) {
   }
   messages.push({ role: "user", content: message || "请按面试口语给我讲这道题：先开口答案，再原理，再可能的追问。" });
 
+  const modelName = prov?.model || prov?.key || activeModel;
   const tryFetch = async () => {
     try {
-      return { ok: true, res: await fetch(prov.baseURL + "/chat/completions", {
+      return { ok: true, res: await fetch(base + "/chat/completions", {
         method: "POST",
         headers: {
           "Authorization": "Bearer " + aiApiKey(),
           "Content-Type": "application/json",
           "Accept": "text/event-stream, application/json",
         },
-        body: JSON.stringify({ model: prov.model, messages, stream: true, temperature: 0.4 }),
+        body: JSON.stringify({ model: modelName, messages, stream: true, temperature: 0.4 }),
       }) };
     } catch (e) {
       return { ok: false, err: e };
@@ -651,18 +1193,14 @@ async function boot() {
   state.providers = meta.providers || [];
   state.model = meta.model || "";
 
-  $("ai-status").textContent = `✅ ${state.providers.length} 个模型 · ${meta.total} 题`;
+  $("ai-status").textContent = state.providers.some((p) => p.model)
+    ? `✅ ${state.providers.length} 个模型 · ${meta.total} 题`
+    : `⏳ 保存 Key 获取模型列表 · ${meta.total} 题`;
 
   // 填充桌面和移动端模型选择器
   const savedModel = (progress.session || {}).model;
-  if (savedModel && state.providers.some((p) => p.key === savedModel)) {
-    state.model = savedModel;
-  }
-  const modelOptions = state.providers.map((p) =>
-    `<option value="${p.key}" ${p.key === state.model ? "selected" : ""}>${p.key}</option>`
-  ).join("");
-  $("model-select").innerHTML = modelOptions;
-  $("m-model-select").innerHTML = modelOptions;
+  if (savedModel) state.model = savedModel;
+  renderModelOptions();
 
   fillTopics();
   const sess = progress.session || {};
@@ -684,6 +1222,7 @@ async function boot() {
   $("sidebar-backdrop").onclick = () => toggleSidebar(false);
 
   $("btn-open-ai").onclick = () => toggleAI(true);
+  $("btn-open-ai-desktop").onclick = () => toggleAI(true);
   $("btn-close-ai").onclick = () => toggleAI(false);
   $("ai-backdrop").onclick = () => toggleAI(false);
 
@@ -693,10 +1232,27 @@ async function boot() {
   $("ai-key-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); saveApiKey(); }
   });
+  $("ai-speech-model-input").value = localStorage.getItem(AI_SPEECH_STORE) || "";
+  $("ai-speech-base-input").value = aiSpeechBaseUrl();
+  $("ai-speech-save").onclick = saveSpeechConfig;
+  $("ai-speech-clear").onclick = clearSpeechConfig;
+  $("ai-speech-key-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveSpeechConfig(); }
+  });
+  updateSpeechUI();
+  $("record-btn").onclick = toggleRecording;
+  $("clear-transcript").onclick = () => { $("answer-transcript").value = ""; $("answer-feedback").hidden = true; };
+  $("evaluate-answer").onclick = evaluateAnswer;
+  $("answer-feedback").onclick = (e) => {
+    const result = e.target.closest("[data-answer-result]")?.dataset.answerResult;
+    if (result) saveAnswerResult(result);
+  };
   $("ai-key-status").onclick = () => testApiKey();
   $("ai-key-status").style.cursor = "pointer";
   $("ai-key-status").title = "点击测试 Key 是否有效";
+  $("ai-base-input").value = aiBaseUrl();
   updateKeyUI();
+  if (aiApiKey()) refreshModelsFromApi();
 
   // 移动端顶部模式切换
   $("m-toggle-mode").onclick = () => {
@@ -770,8 +1326,9 @@ async function boot() {
   };
 
   document.querySelectorAll(".quick-prompts-row button").forEach((btn) => {
-    btn.onclick = () => askAI(btn.dataset.prompt);
+    if (btn.dataset.prompt) btn.onclick = () => askAI(btn.dataset.prompt);
   });
+  $("scene-explain").onclick = explainScene;
 
   // 模型选择器同步并持久化
   $("model-select").onchange = (e) => {
@@ -787,6 +1344,7 @@ async function boot() {
 
   // 键盘快捷键 (针对桌面和外接键盘)
   document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { toggleAI(false); return; }
     if (e.target.matches("textarea, input, select")) return;
     if (e.key === "ArrowRight") show(state.index + 1);
     if (e.key === "ArrowLeft") show(state.index - 1);
