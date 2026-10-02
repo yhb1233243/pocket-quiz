@@ -57,6 +57,10 @@
           <button id="mode-practice" class="active" data-mode="practice">✍️ 刷题模式</button>
           <button id="mode-memorize" data-mode="memorize">📖 背题模式</button>
         </div>
+        <label class="check-item">
+          <input type="checkbox" id="oral-answer-toggle" checked>
+          <span>口头作答（先自己说再看答案）</span>
+        </label>
       </div>
 
       <div class="sidebar-group">
@@ -88,68 +92,12 @@
         </label>
       </div>
 
-      <div class="sidebar-group">
-        <div class="group-title">大模型</div>
-        <label class="field-item">
-          <span class="field-label">对话模型</span>
-          <select id="model-select"></select>
-        </label>
-        <select id="m-model-select" hidden></select>
-        <div class="ai-key-setting" id="ai-key-setting">
-          <div class="ai-key-row">
-            <input type="text" id="ai-base-input" placeholder="接口地址（选填，留空用服务器配置）" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="ai-key-row">
-            <input type="password" id="ai-key-input" placeholder="API Key（sk- 开头）" autocomplete="off" spellcheck="false">
-            <button type="button" id="ai-key-save">保存</button>
-            <button type="button" id="ai-key-clear" title="清除已保存的 Key">清除</button>
-          </div>
-          <div class="ai-key-status" id="ai-key-status">未配置 Key</div>
-        </div>
-      </div>
-
-      <div class="sidebar-group">
-        <div class="group-title">语音模型</div>
-        <div class="ai-key-setting">
-          <div class="ai-key-row">
-            <input type="text" id="ai-speech-base-input" placeholder="语音接口地址（留空用上方大模型）" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="ai-key-row">
-            <input type="text" id="ai-speech-model-input" placeholder="转写模型，默认 qwen3-asr-flash" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="ai-key-row">
-            <input type="password" id="ai-speech-key-input" placeholder="语音 API Key（留空用上方）" autocomplete="off" spellcheck="false">
-            <button type="button" id="ai-speech-save">保存</button>
-            <button type="button" id="ai-speech-clear" title="清除语音配置">清除</button>
-          </div>
-          <div class="ai-key-status" id="ai-speech-status">留空则转写使用上方大模型的地址和 Key</div>
-        </div>
-      </div>
-
-      <div class="sidebar-group">
-        <div class="group-title">答案图片模型</div>
-        <div class="ai-key-setting">
-          <div class="ai-key-row">
-            <input type="text" id="ai-image-base-input" placeholder="图片接口地址（如 https://api.openai.com/v1）" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="ai-key-row">
-            <input type="text" id="ai-image-model-input" placeholder="图片模型，如 gpt-image-2" autocomplete="off" spellcheck="false">
-          </div>
-          <div class="ai-key-row">
-            <input type="password" id="ai-image-key-input" placeholder="图片 API Key（留空用上方）" autocomplete="off" spellcheck="false">
-            <button type="button" id="ai-image-save">保存</button>
-            <button type="button" id="ai-image-clear" title="清除图片配置">清除</button>
-          </div>
-          <div class="ai-key-status" id="ai-image-status">留空则使用上方大模型地址和 Key</div>
-        </div>
-      </div>
+      <button class="settings-open-btn" id="btn-open-settings" type="button">⚙️ 设置</button>
 
       <div class="sidebar-group">
         <div class="group-title">复习统计</div>
         <div class="stats-box" id="stats"></div>
       </div>
-
-      <button class="danger-outline-btn" id="reset-progress">清空本设备刷题进度</button>
     </aside>
 
     <!-- 主答题区 -->
@@ -281,6 +229,78 @@
       <div class="login-err" id="login-err" hidden>口令错误，请重试</div>
       <button type="submit">进入</button>
     </form>
+  </div>
+
+  <!-- 设置弹窗（模型 / Key / 语音 / 图片 / 数据） -->
+  <div class="settings-overlay" id="settings-overlay" hidden>
+    <div class="settings-modal" role="dialog" aria-modal="true" aria-label="设置">
+      <div class="settings-head">
+        <h2>⚙️ 设置</h2>
+        <button class="close-icon-btn" id="btn-close-settings" aria-label="关闭设置">✕</button>
+      </div>
+      <div class="settings-body">
+        <div class="sidebar-group">
+          <div class="group-title">大模型</div>
+          <label class="field-item">
+            <span class="field-label">对话模型</span>
+            <select id="model-select"></select>
+          </label>
+          <select id="m-model-select" hidden></select>
+          <div class="ai-key-setting" id="ai-key-setting">
+            <div class="ai-key-row">
+              <input type="text" id="ai-base-input" placeholder="接口地址（选填，留空用服务器配置）" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ai-key-row">
+              <input type="password" id="ai-key-input" placeholder="API Key（sk- 开头）" autocomplete="off" spellcheck="false">
+              <button type="button" id="ai-key-save">保存</button>
+              <button type="button" id="ai-key-clear" title="清除已保存的 Key">清除</button>
+            </div>
+            <div class="ai-key-status" id="ai-key-status">未配置 Key</div>
+          </div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="group-title">语音模型</div>
+          <div class="ai-key-setting">
+            <div class="ai-key-row">
+              <input type="text" id="ai-speech-base-input" placeholder="语音接口地址（留空用上方大模型）" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ai-key-row">
+              <input type="text" id="ai-speech-model-input" placeholder="转写模型，默认 qwen3-asr-flash" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ai-key-row">
+              <input type="password" id="ai-speech-key-input" placeholder="语音 API Key（留空用上方）" autocomplete="off" spellcheck="false">
+              <button type="button" id="ai-speech-save">保存</button>
+              <button type="button" id="ai-speech-clear" title="清除语音配置">清除</button>
+            </div>
+            <div class="ai-key-status" id="ai-speech-status">留空则转写使用上方大模型的地址和 Key</div>
+          </div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="group-title">答案图片模型</div>
+          <div class="ai-key-setting">
+            <div class="ai-key-row">
+              <input type="text" id="ai-image-base-input" placeholder="图片接口地址（如 https://api.openai.com/v1）" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ai-key-row">
+              <input type="text" id="ai-image-model-input" placeholder="图片模型，如 gpt-image-2" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="ai-key-row">
+              <input type="password" id="ai-image-key-input" placeholder="图片 API Key（留空用上方）" autocomplete="off" spellcheck="false">
+              <button type="button" id="ai-image-save">保存</button>
+              <button type="button" id="ai-image-clear" title="清除图片配置">清除</button>
+            </div>
+            <div class="ai-key-status" id="ai-image-status">留空则使用上方大模型地址和 Key</div>
+          </div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="group-title">数据</div>
+          <button class="danger-outline-btn" id="reset-progress">清空本设备刷题进度</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="/app.js"></script>

@@ -1184,6 +1184,57 @@ select:focus, textarea:focus {
   .feedback-grid { grid-template-columns: 1fr; }
 }
 
+/* ================= 手机端细节优化 (<= 768px) ================= */
+@media (max-width: 768px) {
+  /* 触控目标加大：顶栏模式/AI 按钮 */
+  .m-mode-btn, .m-ai-btn {
+    min-height: 36px;
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  .m-ai-btn { padding: 8px 15px; }
+
+  /* 顶栏计数徽章、品牌副标题、分组标题字号提升 */
+  .m-counter-badge { font-size: 12px; padding: 3px 9px; }
+  .brand-sub { font-size: 11px; }
+  .group-title { font-size: 12px; }
+
+  /* 移除参考图按钮触控区加大 */
+  .reference-image-remove { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+
+  /* 侧栏复选框触控区加大 */
+  .check-item input {
+    width: 22px;
+    height: 22px;
+  }
+  .check-item { min-height: 36px; font-size: 13px; }
+
+  /* AI 面板快捷提问按钮 */
+  .quick-prompts-row button {
+    min-height: 36px;
+    padding: 8px 14px;
+    font-size: 12.5px;
+  }
+  .ai-model-switch select { min-height: 36px; }
+
+  /* 卡片与排版：榨取小屏横向空间 */
+  .question-card { padding: 18px 16px; border-radius: 16px; }
+  .question-title { font-size: 19px; }
+  .main { padding: 10px 12px calc(76px + var(--safe-bottom)) 12px; }
+  .answer-content code { font-size: 13px; }
+  .answer-content pre { padding: 12px; font-size: 13px; }
+  .answer-content pre code { font-size: 13px; }
+
+  /* 参考图预览 */
+  .answer-reference-image, .image-generation-card { padding: 10px 12px; }
+
+  /* 关闭按钮触控区加大 */
+  .close-icon-btn { width: 36px; height: 36px; font-size: 17px; }
+
+  /* 灯箱留边收紧 */
+  .image-lightbox { padding: 16px; }
+}
+
 /* ================= 桌面端适配 (>= 1025px) ================= */
 @media (min-width: 1025px) {
   #sidebar-backdrop { display: none !important; }
@@ -1477,4 +1528,92 @@ select:focus, textarea:focus {
   padding: 11px;
   cursor: pointer;
   box-shadow: 0 4px 12px var(--brand-glow);
+}
+
+/* 口头作答关闭时隐藏作答区 */
+body.oral-off .oral-answer-box { display: none; }
+
+/* ================= 设置入口按钮 ================= */
+.settings-open-btn {
+  width: 100%;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  color: #bae6fd;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.settings-open-btn:hover {
+  background: rgba(56, 189, 248, 0.16);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+.settings-open-btn:active { transform: scale(0.98); }
+
+/* ================= 设置弹窗 ================= */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(2, 6, 16, 0.72);
+  backdrop-filter: blur(6px);
+}
+.settings-overlay[hidden] { display: none; }
+
+.settings-modal {
+  width: min(600px, 100%);
+  max-height: min(86vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: #0e1524;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+.settings-head h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+.settings-body {
+  padding: 4px 18px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-body .sidebar-group { margin: 10px 0 2px; }
+.settings-body .field-label { display: block; }
+.settings-body .ai-key-setting { padding: 10px 0 2px; gap: 8px; }
+.settings-body .ai-key-row input { flex: 1 1 100%; }
+.settings-body .ai-key-row button { flex: 1 1 calc(50% - 4px); }
+.settings-body .danger-outline-btn { width: 100%; margin-top: 4px; }
+
+@media (max-width: 768px) {
+  .settings-overlay { padding: 12px; align-items: flex-end; }
+  .settings-modal {
+    width: 100%;
+    max-height: 88vh;
+    border-radius: 18px 18px 0 0;
+  }
+  .settings-body { padding: 4px 16px calc(16px + env(safe-area-inset-bottom)); }
 }

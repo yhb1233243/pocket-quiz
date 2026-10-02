@@ -8,6 +8,7 @@ const AI_SPEECH_KEY_STORE = "quiz-ai-speech-key-v1";
 const AI_IMAGE_STORE = "quiz-ai-image-v1";
 const AI_IMAGE_BASE_STORE = "quiz-ai-image-base-v1";
 const AI_IMAGE_KEY_STORE = "quiz-ai-image-key-v1";
+const ORAL_ANSWER_STORE = "quiz-oral-answer-v1";
 const OFFLINE_MODE = false;
 
 const state = {
@@ -252,6 +253,15 @@ function toggleAI(open) {
   } else {
     ai.classList.remove("active");
     bd.classList.remove("active");
+  }
+}
+
+// 设置弹窗显隐
+function toggleSettings(open) {
+  $("settings-overlay").hidden = !open;
+  if (open) {
+    toggleSidebar(false);
+    toggleAI(false);
   }
 }
 
@@ -592,6 +602,17 @@ function setRecordStatus(text, error = false) {
   const el = $("record-status");
   el.textContent = text;
   el.classList.toggle("err", error);
+}
+
+function oralAnswerEnabled() {
+  return (localStorage.getItem(ORAL_ANSWER_STORE) ?? "1") !== "0";
+}
+
+function applyOralAnswerSetting() {
+  const enabled = oralAnswerEnabled();
+  document.body.classList.toggle("oral-off", !enabled);
+  const toggle = $("oral-answer-toggle");
+  if (toggle) toggle.checked = enabled;
 }
 
 function resetAnswerPanel() {
@@ -1223,6 +1244,7 @@ async function boot() {
   if (sess.module) $("module-select").value = sess.module;
   if (sess.filter) $("filter-select").value = sess.filter;
   $("shuffle").checked = !!sess.shuffle;
+  applyOralAnswerSetting();
   state.mode = sess.mode === "memorize" ? "memorize" : "practice";
   setMode(state.mode);
 
@@ -1239,6 +1261,23 @@ async function boot() {
   $("btn-open-ai-desktop").onclick = () => toggleAI(true);
   $("btn-close-ai").onclick = () => toggleAI(false);
   $("ai-backdrop").onclick = () => toggleAI(false);
+
+  // 设置弹窗
+  $("btn-open-settings").onclick = () => toggleSettings(true);
+  $("btn-close-settings").onclick = () => toggleSettings(false);
+  $("settings-overlay").addEventListener("mousedown", (e) => {
+    if (e.target === $("settings-overlay")) toggleSettings(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("settings-overlay").hidden) toggleSettings(false);
+  });
+
+  // 口头作答开关
+  $("oral-answer-toggle").onchange = (e) => {
+    localStorage.setItem(ORAL_ANSWER_STORE, e.target.checked ? "1" : "0");
+    if (!e.target.checked) stopRecording(true);
+    applyOralAnswerSetting();
+  };
 
   // Key 设置
   $("ai-key-save").onclick = () => saveApiKey();
