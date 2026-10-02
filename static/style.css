@@ -1540,6 +1540,29 @@ select:focus, textarea:focus {
 /* 口头作答关闭时隐藏作答区 */
 body.oral-off .oral-answer-box { display: none; }
 
+/* ================= 跳转题号 ================= */
+.question-seq, .m-counter-badge { cursor: pointer; }
+.question-seq:hover { color: #93c5fd; background: rgba(147, 197, 253, 0.12); }
+.m-counter-badge:hover { border-color: rgba(147, 197, 253, 0.45); color: #bfdbfe; }
+
+.jump-card { max-width: 320px; }
+.jump-card input {
+  width: 100%;
+  margin-top: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 15px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  outline: none;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.jump-card input::-webkit-outer-spin-button,
+.jump-card input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.jump-card input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16); }
+
 /* ================= 设置入口按钮 ================= */
 .settings-open-btn {
   width: 100%;

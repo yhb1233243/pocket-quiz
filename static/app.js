@@ -265,6 +265,36 @@ function toggleSettings(open) {
   }
 }
 
+// 跳转题号弹窗
+function openJump() {
+  const pool = filtered();
+  if (!pool.length) return;
+  $("jump-range").textContent = `共 ${pool.length} 题，当前第 ${state.index + 1} 题`;
+  $("jump-err").hidden = true;
+  $("jump-overlay").hidden = false;
+  const input = $("jump-input");
+  input.value = state.index + 1;
+  input.max = pool.length;
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+function closeJump() {
+  $("jump-overlay").hidden = true;
+}
+
+function submitJump(e) {
+  e.preventDefault();
+  const pool = filtered();
+  const n = parseInt($("jump-input").value, 10);
+  if (!Number.isInteger(n) || n < 1 || n > pool.length) {
+    $("jump-err").textContent = `请输入 1 ~ ${pool.length} 之间的题号`;
+    $("jump-err").hidden = false;
+    return;
+  }
+  closeJump();
+  show(n - 1);
+}
+
 async function show(i) {
   const pool = filtered();
   if (!pool.length) {
@@ -1378,6 +1408,14 @@ async function boot() {
     toggleSidebar(false);
   };
 
+  // 跳转题号
+  $("q-meta").onclick = openJump;
+  $("m-crumb-counter").onclick = openJump;
+  $("jump-form").onsubmit = submitJump;
+  $("jump-overlay").addEventListener("mousedown", (e) => {
+    if (e.target === $("jump-overlay")) closeJump();
+  });
+
   // AI 问答表单
   $("chat-form").onsubmit = (e) => {
     e.preventDefault();
@@ -1406,7 +1444,12 @@ async function boot() {
 
   // 键盘快捷键 (针对桌面和外接键盘)
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { toggleAI(false); return; }
+    if (e.key === "Escape") {
+      toggleAI(false);
+      if (!$("settings-overlay").hidden) toggleSettings(false);
+      if (!$("jump-overlay").hidden) closeJump();
+      return;
+    }
     if (e.target.matches("textarea, input, select")) return;
     if (e.key === "ArrowRight") show(state.index + 1);
     if (e.key === "ArrowLeft") show(state.index - 1);

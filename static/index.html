@@ -21,7 +21,7 @@
     </button>
     <div class="mobile-title-wrap">
       <span class="m-topic-name" id="m-crumb-topic">Java 核心</span>
-      <span class="m-counter-badge" id="m-crumb-counter">1/817</span>
+      <span class="m-counter-badge" id="m-crumb-counter" title="点击跳转到指定题号">1/817</span>
     </div>
     <div class="mobile-nav-tools">
       <button class="m-mode-btn" id="m-toggle-mode" title="点击在刷题和背题模式间切换">
@@ -123,7 +123,7 @@
             <span class="tag-module" id="tag-module">核心语法</span>
             <span class="tag-core" id="q-core-tag" style="display:none;">核心高频</span>
           </div>
-          <span class="question-seq" id="q-meta">1/817</span>
+          <span class="question-seq" id="q-meta" title="点击跳转到指定题号">1/817</span>
         </div>
 
         <h2 class="question-title" id="q-title">加载题库中...</h2>
@@ -304,6 +304,17 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 跳转题号弹窗 -->
+  <div class="login-overlay" id="jump-overlay" hidden>
+    <form class="login-card jump-card" id="jump-form">
+      <h2>🔢 跳转到题目</h2>
+      <p id="jump-range">共 0 题</p>
+      <input type="number" id="jump-input" inputmode="numeric" min="1" step="1" placeholder="题号" autocomplete="off">
+      <div class="login-err" id="jump-err" hidden>请输入有效题号</div>
+      <button type="submit">跳转</button>
+    </form>
   </div>
 
   <script src="/app.js"></script>
