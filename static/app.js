@@ -782,7 +782,12 @@ function feedbackHtml(feedback, raw) {
 async function evaluateAnswer() {
   const answer = $("answer-transcript").value.trim();
   if (!answer || !state.current || state.evaluating) return;
-  if (!aiApiKey()) { toggleAI(true); updateKeyUI("err", "请先保存 API Key"); return; }
+  if (!aiApiKey()) {
+    setRecordStatus("请先配置 API Key：⚙️ 设置 → 大模型，保存后再提交评价", true);
+    updateKeyUI("err", "请先输入 API Key 并保存，然后再提交评价");
+    toggleSettings(true);
+    return;
+  }
   const prov = providerForModel();
   const base = effectiveBaseURL(prov);
   if (!base) { setRecordStatus("请先填写接口地址并保存", true); return; }
@@ -1060,8 +1065,10 @@ async function askAI(message) {
   if (!state.current) return;
   toggleAI(true);
   if (!aiApiKey()) {
-    updateKeyUI("err", "请先在下方输入 API Key 并保存，然后再提问");
-    $("ai-key-input").focus();
+    const box = addMsg("assistant", "⚙️ 请先配置 API Key：点「⚙️ 设置 → 大模型」填入并保存，之后就能提问了。");
+    box.classList.add("err");
+    updateKeyUI("err", "请先输入 API Key 并保存，然后再提问");
+    toggleSettings(true);
     return;
   }
   addMsg("user", message);
