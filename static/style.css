@@ -870,6 +870,13 @@ select:focus, textarea:focus {
 .dock-star.active { background: var(--warn-bg); border-color: var(--warn-border); color: #fde68a; }
 .dock-master.active { background: var(--ok-bg); border-color: var(--ok-border); color: #6ee7b7; }
 
+/* 上一题按钮：紧凑箭头，不占 flex 份额 */
+.dock-prev {
+  flex: 0 0 auto;
+  width: 46px;
+  font-size: 16px;
+}
+
 .dock-primary-btn {
   flex: 1.8;
   min-width: 0;

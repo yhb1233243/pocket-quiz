@@ -1355,6 +1355,7 @@ async function boot() {
   $("m-btn-wrong").onclick = () => mark("wrong");
   $("m-btn-master").onclick = () => mark("mastered");
   $("m-btn-star").onclick = () => mark("starred");
+  $("m-btn-prev").onclick = () => show(state.index - 1);
   $("m-btn-next").onclick = () => {
     if (state.mode === "practice" && !state.revealed) {
       reveal();
