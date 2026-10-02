@@ -5,6 +5,10 @@ const AI_BASE_STORE = "quiz-ai-base-v1";
 const AI_SPEECH_STORE = "quiz-ai-speech-v1";
 const AI_SPEECH_BASE_STORE = "quiz-ai-speech-base-v1";
 const AI_SPEECH_KEY_STORE = "quiz-ai-speech-key-v1";
+const AI_IMAGE_STORE = "quiz-ai-image-v1";
+const AI_IMAGE_BASE_STORE = "quiz-ai-image-base-v1";
+const AI_IMAGE_KEY_STORE = "quiz-ai-image-key-v1";
+const OFFLINE_MODE = false;
 
 const state = {
   topics: [],
@@ -22,6 +26,7 @@ const state = {
   recordStartedAt: 0,
   recordTimer: null,
   evaluating: false,
+  imageBusy: false,
 };
 
 function escapeHtml(text) {
@@ -263,7 +268,6 @@ async function show(i) {
   state.revealed = state.mode === "memorize" || !!rec(q.id).revealed;
   state.chat = [];
   $("chat").innerHTML = "";
-  stopScenePlayback();
   resetAnswerPanel();
 
   // 题目与元信息
@@ -290,6 +294,7 @@ async function show(i) {
   if (q.recite) parts.push(`<div class="reason"><div class="k">🎯 核心速记口诀</div>${md(q.recite)}</div>`);
   parts.push(`<div class="reason"><div class="k">📖 完整考点与源码解析</div>${md(q.answer)}</div>`);
   $("answer").innerHTML = parts.join("");
+  renderReferenceImage(q.id);
 
   // 卡片状态样式
   const card = $("question-card");
@@ -406,6 +411,77 @@ function addMsg(role, text, asMarkdown = false) {
   return el;
 }
 
+function referenceImageSrc(ref) {
+  if (typeof ref === "string") return ref;
+  return ref?.src || ref?.url || ref?.dataUrl || "";
+}
+
+function safeImageSrc(src) {
+  return /^(data:image\/(?:png|jpeg|webp);base64,|https?:\/\/|\/media\/)/i.test(String(src || "")) ? String(src) : "";
+}
+
+let lightboxEl = null;
+function openLightbox(src) {
+  if (!lightboxEl) {
+    lightboxEl = document.createElement("div");
+    lightboxEl.className = "image-lightbox";
+    lightboxEl.innerHTML = '<img alt="大图预览">';
+    lightboxEl.addEventListener("click", () => lightboxEl.classList.remove("open"));
+    document.body.appendChild(lightboxEl);
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") lightboxEl.classList.remove("open"); });
+  }
+  lightboxEl.querySelector("img").src = src;
+  lightboxEl.classList.add("open");
+}
+
+function openImageDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("quiz-reference-images-v1", 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("images");
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function saveOfflineImage(qid, dataUrl) {
+  const db = await openImageDb();
+  return new Promise((resolve, reject) => { const tx = db.transaction("images", "readwrite"); tx.objectStore("images").put(dataUrl, String(qid)); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+}
+async function loadOfflineImage(qid) {
+  const db = await openImageDb();
+  return new Promise((resolve, reject) => { const tx = db.transaction("images", "readonly"); const req = tx.objectStore("images").get(String(qid)); req.onsuccess = () => resolve(req.result || ""); req.onerror = () => reject(req.error); });
+}
+function deleteOfflineImage(qid) {
+  return openImageDb().then((db) => new Promise((resolve, reject) => { const tx = db.transaction("images", "readwrite"); tx.objectStore("images").delete(String(qid)); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); }));
+}
+async function resolveReferenceImage(ref, qid) {
+  const raw = referenceImageSrc(ref);
+  return raw === `idb:${qid}` ? loadOfflineImage(qid).catch(() => "") : raw;
+}
+
+async function renderReferenceImage(qid) {
+  const ref = rec(qid).referenceImage;
+  if (!ref) return;
+  const src = safeImageSrc(await resolveReferenceImage(ref, qid));
+  if (!src || state.current?.id !== qid) return;
+  $("answer").insertAdjacentHTML("afterbegin", `<section class="answer-reference-image"><div class="answer-reference-title"><span>🖼️ 已保存的答案参考图</span><button type="button" class="reference-image-remove" data-remove-image>移除</button></div><img src="${escapeHtml(src)}" alt="这道题的答案参考图" loading="lazy"></section>`);
+  $("answer").querySelector("[data-remove-image]").onclick = removeReferenceImage;
+  $("answer").querySelector(".answer-reference-image img").onclick = (event) => openLightbox(event.currentTarget.src);
+}
+
+async function removeReferenceImage(event) {
+  const section = event.currentTarget.closest(".answer-reference-image");
+  const qid = state.current?.id;
+  if (section == null || qid == null) return;
+  if (!confirm("确定删除这道题已保存的参考图吗？")) return;
+  try {
+    if (OFFLINE_MODE) await deleteOfflineImage(qid);
+    await saveProgress({ question: { id: qid, referenceImage: null, referenceImageAt: null } });
+    section.remove();
+  } catch (error) {
+    alert("删除失败：" + error.message);
+  }
+}
+
 function aiApiKey() {
   return localStorage.getItem(AI_KEY_STORE) || "";
 }
@@ -485,6 +561,31 @@ function clearSpeechConfig() {
   $("ai-speech-base-input").value = "";
   $("ai-speech-key-input").value = "";
   updateSpeechUI();
+}
+
+function imageModel() { return (localStorage.getItem(AI_IMAGE_STORE) || "gpt-image-2").trim(); }
+function imageBaseUrl() { return (localStorage.getItem(AI_IMAGE_BASE_STORE) || "").trim().replace(/\/+$/, ""); }
+function imageApiKey() { return localStorage.getItem(AI_IMAGE_KEY_STORE) || aiApiKey(); }
+function imageAuth() { return { key: imageApiKey(), base: imageBaseUrl() || effectiveBaseURL(providerForModel()) }; }
+function updateImageUI(text) {
+  const el = $("ai-image-status");
+  const key = localStorage.getItem(AI_IMAGE_KEY_STORE);
+  el.classList.toggle("ok", !!key || !!aiApiKey());
+  el.classList.toggle("err", false);
+  el.textContent = text || (key ? `图片 Key 已保存：${key.slice(0, 7)}…${key.slice(-4)}` : "留空则使用上方大模型地址和 Key");
+}
+function saveImageConfig() {
+  const model = ($("ai-image-model-input").value || "").trim();
+  const base = ($("ai-image-base-input").value || "").trim().replace(/\/+$/, "");
+  const key = ($("ai-image-key-input").value || "").trim().replace(/^["'`\s]+|["'`\s]+$/g, "");
+  if (model) localStorage.setItem(AI_IMAGE_STORE, model); else localStorage.removeItem(AI_IMAGE_STORE);
+  if (base) localStorage.setItem(AI_IMAGE_BASE_STORE, base); else localStorage.removeItem(AI_IMAGE_BASE_STORE);
+  if (key) { localStorage.setItem(AI_IMAGE_KEY_STORE, key); $("ai-image-key-input").value = ""; }
+  updateImageUI("✅ 图片模型配置已保存");
+}
+function clearImageConfig() {
+  localStorage.removeItem(AI_IMAGE_STORE); localStorage.removeItem(AI_IMAGE_BASE_STORE); localStorage.removeItem(AI_IMAGE_KEY_STORE);
+  $("ai-image-model-input").value = ""; $("ai-image-base-input").value = ""; $("ai-image-key-input").value = ""; updateImageUI();
 }
 
 function setRecordStatus(text, error = false) {
@@ -788,204 +889,117 @@ async function testApiKey() {
   }
 }
 
-let sceneToken = 0;
-let sceneOwner = 0;
-let sceneTimer = null;
 let sceneBusy = false;
 
-function stopScenePlayback() {
-  sceneOwner = 0;
-  clearTimeout(sceneTimer);
-  sceneTimer = null;
+
+function imagePrompt(q) {
+  return `Create a high-quality educational technical diagram for a Chinese Java backend interview question.
+Use simplified Chinese labels only. Explain the mechanism visually, not as a poster full of paragraphs.
+Use clear modules, arrows, containers, timelines or data structures when relevant. Keep labels short and legible.
+Prefer a clean dark technical documentation style, high contrast, generous spacing, no decorative characters, no watermark, no English unless it is an unavoidable API/class name.
+The image must be simple and easy to understand at a glance: prioritize clarity over completeness, use the fewest elements needed, large readable text, and leave nothing that requires puzzling out.
+The image must be useful as an answer reference: show the key flow, why it works, important conditions or exceptions, and the main comparison if the question compares concepts.
+Question: ${q.title}
+Interview answer: ${(q.answer || "").slice(0, 7000)}
+Interview oral version: ${(q.oral || "").slice(0, 1800)}
+Core principle: ${(q.reason || "").slice(0, 2200)}
+Pitfalls: ${(q.pit || "").slice(0, 1800)}`;
 }
 
-function scenePrompt(q) {
-  const attempt = rec(q.id).answerAttempts?.slice(-1)[0];
-  const feedback = attempt?.feedback || {};
-  return `你是 Java 面试教练。请把这道题整理成“答案地图”，帮助用户理解机制并在面试中复述。只返回 JSON，不要 Markdown、代码块或额外文字。
-输出格式：
-{"type":"process|compare|structure|answer","takeaway":"一句话结论","skeleton":["3到5个答题要点"],"nodes":[{"id":"a","label":"节点名"}],"comparisons":[{"left":"概念A","right":"概念B","difference":"关键区别"}],"steps":[{"title":"步骤名","what":"发生了什么","why":"为什么","condition":"关键条件或例外","visible":["a"],"arrows":[{"from":"a","to":"b","label":"条件"}],"focus":["a"]}],"pitfalls":["易错点"],"followups":[{"question":"追问","answer":"答法"}],"checkQuestion":"自测问题","checkAnswer":"自测答案"}
-规则：
-1. type 按题目选择：流程用 process，横向区别用 compare，状态/结构变化用 structure，行为题或不适合画图用 answer。
-2. 流程/结构题 nodes 放全程复用的 2 到 8 个稳定节点；对比题和行为题 nodes 可为空。id 只用小写字母和数字，label 不超过 12 个汉字。每一步 visible 只写当前出现的节点 id，不能改节点含义。
-3. steps 输出 3 到 6 步，每步必须有 title、what、why、condition；what 说明发生了什么，why 说明设计原因，condition 只在确有条件或例外时填写。
-4. compare 题必须输出 2 到 4 组 comparisons，每组包含 left、right、difference；不适合画图时不要生成 nodes 或箭头。箭头只表达真实关系或先后顺序，不要为了凑图添加箭头。不要发明参考资料中没有的事实。
-5. skeleton 是用户可以直接复述的答题骨架；pitfalls 写最容易说错的点；followups 写 2 个高频追问；checkQuestion 只能检查一个关键条件。
-6. 这是面试学习卡，不是装饰性动画。优先保留“为什么、条件、例外、复杂度、输入输出”等信息；不适合画图时仍要输出高质量 answer map，nodes 可以是空数组。
-题目：${q.title}
-面试口语版：${(q.oral || "（无）").slice(0, 1800)}
-原理说明：${(q.reason || "（无）").slice(0, 2200)}
-易错点与追问：${(q.pit || "（无）").slice(0, 1800)}
-完整参考答案：${(q.answer || "").slice(0, 5000)}
-${attempt?.answer ? `用户最近一次回答：${attempt.answer.slice(0, 2200)}` : "用户还没有提交回答。"}
-${feedback.missing?.length ? `这次回答遗漏：${feedback.missing.join("；")}` : ""}
-${feedback.incorrect?.length ? `这次回答可能有误：${feedback.incorrect.join("；")}` : ""}`;
+function imageEndpoint(base) {
+  return /\/images\/generations$/i.test(base) ? base : base + "/images/generations";
 }
 
-function normalizeScene(data) {
-  const cleanId = (id) => String(id || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
-  const nodeMap = new Map();
-  const addNode = (node) => {
-    const id = cleanId(typeof node === "string" ? node : node?.id);
-    const label = String(typeof node === "string" ? node : node?.label || node?.text || "").trim().slice(0, 12);
-    if (id && label && !nodeMap.has(id)) nodeMap.set(id, { id, label });
-    return id;
-  };
-  (Array.isArray(data?.nodes) ? data.nodes : Array.isArray(data?.entities) ? data.entities : []).slice(0, 8).forEach(addNode);
-  const rawSteps = Array.isArray(data?.steps) ? data.steps.slice(0, 6) : [];
-  rawSteps.forEach((step) => (Array.isArray(step.nodes) ? step.nodes : []).forEach(addNode));
-  const nodes = [...nodeMap.values()].slice(0, 8);
-  const ids = new Set(nodes.map((node) => node.id));
-  const clean = rawSteps.map((step) => {
-    const rawVisible = Array.isArray(step.visible) ? step.visible : Array.isArray(step.nodes) ? step.nodes : nodes.map((node) => node.id);
-    const visible = rawVisible.map((node) => cleanId(typeof node === "string" ? node : node?.id)).filter((id) => ids.has(id));
-    const rawArrows = Array.isArray(step.arrows) ? step.arrows : Array.isArray(step.edges) ? step.edges : [];
-    const arrows = rawArrows.map((arrow) => ({
-      from: cleanId(arrow.from),
-      to: cleanId(arrow.to),
-      label: String(arrow.label || "").trim().slice(0, 10),
-    })).filter((arrow) => ids.has(arrow.from) && ids.has(arrow.to) && arrow.from !== arrow.to && visible.includes(arrow.from) && visible.includes(arrow.to));
-    const rawFocus = Array.isArray(step.focus) ? step.focus : Array.isArray(step.highlight) ? step.highlight : [];
-    const focus = rawFocus.map(cleanId).filter((id) => ids.has(id) && visible.includes(id));
-    return {
-      title: String(step.title || step.say || step.caption || "分步讲解").trim().slice(0, 28),
-      what: String(step.what || step.say || "").trim().slice(0, 110),
-      why: String(step.why || "").trim().slice(0, 110),
-      condition: String(step.condition || "").trim().slice(0, 90),
-      visible: [...new Set(visible)], arrows, focus,
-    };
-  }).filter((step) => step.what && (!nodes.length || step.visible.length >= 1));
-  if (clean.length < 2) return null;
-  return {
-    type: ["process", "compare", "structure", "answer"].includes(data?.type) ? data.type : "process",
-    takeaway: String(data?.takeaway || "").trim().slice(0, 180),
-    skeleton: Array.isArray(data?.skeleton) ? data.skeleton.map((x) => String(x).trim().slice(0, 100)).filter(Boolean).slice(0, 5) : [],
-    comparisons: Array.isArray(data?.comparisons) ? data.comparisons.map((x) => ({ left: String(x?.left || "").trim().slice(0, 80), right: String(x?.right || "").trim().slice(0, 80), difference: String(x?.difference || "").trim().slice(0, 160) })).filter((x) => x.left && x.right && x.difference).slice(0, 4) : [],
-    nodes, steps: clean,
-    pitfalls: Array.isArray(data?.pitfalls) ? data.pitfalls.map((x) => String(x).trim().slice(0, 120)).filter(Boolean).slice(0, 4) : [],
-    followups: Array.isArray(data?.followups) ? data.followups.map((x) => ({ question: String(x?.question || "").trim().slice(0, 100), answer: String(x?.answer || "").trim().slice(0, 160) })).filter((x) => x.question && x.answer).slice(0, 3) : [],
-    checkQuestion: String(data?.checkQuestion || "").trim().slice(0, 120),
-    checkAnswer: String(data?.checkAnswer || "").trim().slice(0, 180),
-  };
+function extractImageResult(data) {
+  const first = data?.data?.[0] || data?.images?.[0] || data?.output?.[0] || data?.result?.[0];
+  if (typeof first === "string") return { src: first };
+  if (!first || typeof first !== "object") return null;
+  const b64 = first.b64_json || first.base64 || first.base64Image || first.image;
+  const url = first.url || first.uri || first.image_url;
+  if (b64) return { src: String(b64).startsWith("data:") ? String(b64) : `data:image/png;base64,${b64}` };
+  return url ? { src: String(url) } : null;
 }
 
-function mountScene(box, scene) {
-  const token = ++sceneToken;
-  let index = 0;
-  let playing = false;
-  const { nodes, steps } = scene;
-  const hasDiagram = nodes.length > 0 && ["process", "structure"].includes(scene.type);
-  const cols = Math.min(3, nodes.length || 1);
-  const rows = Math.max(1, Math.ceil(nodes.length / cols));
-  const pos = {};
-  nodes.forEach((node, i) => { pos[node.id] = { x: 16 + (i % cols) * 104, y: 16 + Math.floor(i / cols) * 72 }; });
-  const draw = () => {
-    const step = steps[index];
-    const condition = step.condition ? `<div class="scene-condition"><b>关键条件：</b>${escapeHtml(step.condition)}</div>` : "";
-    box.querySelector(".scene-title").textContent = `${index + 1}. ${step.title}`;
-    box.querySelector(".scene-what").textContent = step.what;
-    box.querySelector(".scene-why").textContent = step.why ? `为什么：${step.why}` : "";
-    box.querySelector(".scene-condition").outerHTML = condition || `<div class="scene-condition" hidden></div>`;
-    if (!hasDiagram) return;
-    const lines = step.arrows.map((arrow) => {
-      const a = pos[arrow.from];
-      const b = pos[arrow.to];
-      const x1 = a.x + 44;
-      const y1 = a.y + 20;
-      const x2 = b.x + 44;
-      const y2 = b.y + 20;
-      const label = arrow.label ? `<text class="scene-arrow-label" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 4}">${escapeHtml(arrow.label)}</text>` : "";
-      return `<line class="scene-arrow" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" marker-end="url(#scene-arrow-${token})"/>${label}`;
-    }).join("");
-    const visible = new Set(step.visible);
-    const focus = new Set(step.focus.length ? step.focus : step.visible);
-    const nodeHtml = nodes.map((node) => {
-      const p = pos[node.id];
-      const shown = visible.has(node.id);
-      const on = focus.has(node.id);
-      return `<g class="scene-node${shown ? " visible" : ""}${on ? " on" : ""}"><rect x="${p.x}" y="${p.y}" width="88" height="40" rx="8"/><text x="${p.x + 44}" y="${p.y + 20}">${escapeHtml(node.label)}</text></g>`;
-    }).join("");
-    box.querySelector(".scene-stage").innerHTML = `<defs><marker id="scene-arrow-${token}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#93c5fd"/></marker></defs>${lines}${nodeHtml}`;
-    box.querySelector(".scene-play").textContent = playing ? "暂停" : "播放";
-    box.querySelector(".scene-count").textContent = `${index + 1}/${steps.length}`;
-  };
-  const schedule = () => {
-    clearTimeout(sceneTimer);
-    if (!playing || sceneOwner !== token) return;
-    sceneTimer = setTimeout(() => {
-      if (sceneOwner !== token || !playing) return;
-      index = (index + 1) % steps.length;
-      draw();
-      schedule();
-    }, 2400);
-  };
-  box.onclick = (event) => {
-    const action = event.target.closest("[data-scene]")?.dataset.scene;
-    if (!action) return;
-    if (action === "prev") index = (index + steps.length - 1) % steps.length;
-    if (action === "next") index = (index + 1) % steps.length;
-    if (action === "prev" || action === "next") playing = false;
-    if (action === "play") {
-      playing = !playing;
-      if (playing) sceneOwner = token;
+async function imageToDataUrl(src) {
+  if (String(src).startsWith("data:image/")) return src;
+  const res = await fetch(src);
+  if (!res.ok) throw new Error(`图片下载失败：HTTP ${res.status}`);
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(res.blob());
+  });
+}
+
+async function saveGeneratedReference(qid, src, button) {
+  button.disabled = true;
+  button.textContent = "保存中…";
+  try {
+    const dataUrl = await imageToDataUrl(src);
+    let reference;
+    if (OFFLINE_MODE) {
+      await saveOfflineImage(qid, dataUrl);
+      reference = `idb:${qid}`;
+    } else {
+      const res = await fetch("/api/generated-image", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: qid, dataUrl }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      reference = data.url;
     }
-    draw();
-    schedule();
-  };
-  const summary = scene.takeaway ? `<div class="scene-takeaway"><b>一句话结论</b><p>${escapeHtml(scene.takeaway)}</p></div>` : "";
-  const skeleton = scene.skeleton.length ? `<div class="scene-skeleton"><b>面试答题骨架</b><ol>${scene.skeleton.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ol></div>` : "";
-  const pitfalls = scene.pitfalls.length ? `<details class="scene-details"><summary>⚠️ 易错点</summary><ul>${scene.pitfalls.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></details>` : "";
-  const followups = scene.followups.length ? `<details class="scene-details"><summary>🎯 高频追问</summary>${scene.followups.map((item) => `<div class="scene-followup"><b>${escapeHtml(item.question)}</b><p>${escapeHtml(item.answer)}</p></div>`).join("")}</details>` : "";
-  const check = scene.checkQuestion ? `<div class="scene-details scene-check"><b>🧠 自测</b><p>${escapeHtml(scene.checkQuestion)}</p><details><summary>显示参考答案</summary><p class="scene-check-answer">${escapeHtml(scene.checkAnswer || "暂无答案")}</p></details></div>` : "";
-  const compare = scene.comparisons.length ? `<div class="scene-comparisons">${scene.comparisons.map((item) => `<div class="scene-compare"><div><b>${escapeHtml(item.left)}</b></div><div><b>${escapeHtml(item.right)}</b></div><p>${escapeHtml(item.difference)}</p></div>`).join("")}</div>` : "";
-  const diagram = hasDiagram ? `<svg class="scene-stage" viewBox="0 0 328 ${20 + rows * 72}" role="img" aria-label="答案地图"></svg><div class="scene-controls"><button type="button" data-scene="prev">上一步</button><button type="button" class="scene-play" data-scene="play">播放</button><button type="button" data-scene="next">下一步</button><span class="scene-count"></span></div>` : `<div class="scene-no-diagram">这道题更适合用答题骨架和追问练习，不强行画图。</div>`;
-  const stepsHtml = hasDiagram ? `<div class="scene-step"><div class="scene-title"></div><div class="scene-what"></div><div class="scene-why"></div><div class="scene-condition" hidden></div>${diagram}</div>` : `<div class="scene-text-steps">${steps.map((step, i) => `<article class="scene-step"><div class="scene-title">${i + 1}. ${escapeHtml(step.title)}</div><div class="scene-what">${escapeHtml(step.what)}</div>${step.why ? `<div class="scene-why">为什么：${escapeHtml(step.why)}</div>` : ""}${step.condition ? `<div class="scene-condition"><b>关键条件：</b>${escapeHtml(step.condition)}</div>` : ""}</article>`).join("")}</div>`;
-  box.innerHTML = `<div class="scene-player">${summary}${skeleton}${stepsHtml}${scene.type === "compare" ? compare : ""}${pitfalls}${followups}${check}</div>`;
-  if (hasDiagram) draw();
+    await saveProgress({ question: { id: qid, referenceImage: reference, referenceImageAt: Date.now() } });
+    button.textContent = "✅ 已保存为本题参考图";
+    button.classList.add("saved");
+    if (state.current?.id === qid) renderReferenceImage(qid);
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = `保存失败：${error.message}`;
+  }
+}
+
+function mountGeneratedImage(box, image, qid) {
+  const src = safeImageSrc(image.src);
+  if (!src) throw new Error("图片接口没有返回可用图片");
+  box.innerHTML = `<div class="image-generation-card"><div class="image-generation-title">🖼️ 答案参考图预览</div><img class="generated-answer-image" src="${escapeHtml(src)}" alt="AI 生成的答案参考图"><p class="image-generation-tip">确认图片中的技术结构和文字无误后，再保存为本题答案参考。</p><div class="image-generation-actions"><button type="button" class="btn-primary" data-image-save>保存为本题参考图</button><button type="button" class="ghost-btn" data-image-regenerate>重新生成</button></div></div>`;
+  box.querySelector("[data-image-save]").onclick = (event) => saveGeneratedReference(qid, image.src, event.currentTarget);
+  box.querySelector("[data-image-regenerate]").onclick = () => explainScene();
+  box.querySelector(".generated-answer-image").onclick = (event) => openLightbox(event.currentTarget.src);
 }
 
 async function explainScene() {
   if (!state.current || sceneBusy) return;
   toggleAI(true);
-  if (!aiApiKey()) {
-    updateKeyUI("err", "请先在下方输入 API Key 并保存，然后再提问");
-    $("ai-key-input").focus();
+  const auth = imageAuth();
+  if (!auth.key) {
+    updateImageUI("请先配置图片 API Key");
+    $("ai-image-key-input").focus();
     return;
   }
-  const activeModel = $("m-model-select").value || $("model-select").value || state.model;
-  const prov = state.providers.find((p) => p.key === activeModel) || providerForModel(activeModel);
-  const base = effectiveBaseURL(prov);
-  if (!base) {
-    updateKeyUI("err", "请先填写接口地址并保存");
+  if (!auth.base) {
+    updateImageUI("请先填写图片接口地址");
     return;
   }
   sceneBusy = true;
-  stopScenePlayback();
   const q = state.current;
-   const ask = "生成这道题的答案地图";
+  const ask = "生成这道题的答案参考图";
   addMsg("user", ask);
   state.chat.push({ role: "user", content: ask });
-  const box = addMsg("assistant", "正在生成动态讲解…");
+  const box = addMsg("assistant", "正在生成答案参考图…");
   try {
-    const res = await fetch(base + "/chat/completions", {
+    const res = await fetch(imageEndpoint(auth.base), {
       method: "POST",
-      headers: { "Authorization": "Bearer " + aiApiKey(), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: prov?.model || prov?.key || activeModel,
-        messages: [{ role: "user", content: scenePrompt(q) }],
-        stream: false,
-        temperature: 0.2,
-      }),
+      headers: { "Authorization": "Bearer " + auth.key, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: imageModel(), prompt: imagePrompt(q), size: "1536x1024", quality: "high", response_format: "b64_json" }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error?.message || data.message || `HTTP ${res.status}`);
-     const scene = normalizeScene(parseJsonResponse(responseText(data)));
-     if (!scene) throw new Error("模型没有返回可播放的答案地图");
-     mountScene(box, scene);
-     state.chat.push({ role: "assistant", content: "答案地图：" + [scene.takeaway, ...scene.skeleton].filter(Boolean).join("；") });
+    const image = extractImageResult(data);
+    if (!image) throw new Error("图片接口没有返回图片，请把 GPT Image 2 的返回示例发给我");
+    mountGeneratedImage(box, image, q.id);
+    state.chat.push({ role: "assistant", content: "已生成答案参考图，等待确认保存。" });
   } catch (error) {
     box.classList.add("err");
-    box.textContent = "动态讲解失败：" + error.message;
+    box.textContent = "答案图生成失败：" + error.message;
   } finally {
     sceneBusy = false;
   }
@@ -1240,6 +1254,14 @@ async function boot() {
     if (e.key === "Enter") { e.preventDefault(); saveSpeechConfig(); }
   });
   updateSpeechUI();
+  $("ai-image-model-input").value = localStorage.getItem(AI_IMAGE_STORE) || "";
+  $("ai-image-base-input").value = imageBaseUrl();
+  $("ai-image-save").onclick = saveImageConfig;
+  $("ai-image-clear").onclick = clearImageConfig;
+  $("ai-image-key-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveImageConfig(); }
+  });
+  updateImageUI();
   $("record-btn").onclick = toggleRecording;
   $("clear-transcript").onclick = () => { $("answer-transcript").value = ""; $("answer-feedback").hidden = true; };
   $("evaluate-answer").onclick = evaluateAnswer;

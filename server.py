@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import base64
 import json
 import os
 import re
 import socket
 import threading
+import uuid
 import urllib.error
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +21,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "config.json"
 PROGRESS_PATH = ROOT / "data" / "progress.json"
+GENERATED_IMAGE_DIR = ROOT / "data" / "generated"
 CURATED_PATH = ROOT / "curated_answers.json"
 TOPICS_PATH = ROOT / "topics.json"
 STATIC_DIR = ROOT / "static"
@@ -314,21 +317,39 @@ def default_progress(n: int) -> dict:
     }
 
 
+def _load_progress_unlocked(n: int) -> dict:
+    data = load_json(PROGRESS_PATH, None)
+    if not isinstance(data, dict):
+        data = default_progress(n)
+    data.setdefault("questions", {})
+    data.setdefault("session", default_progress(n)["session"])
+    return data
+
+
 def read_progress(n: int) -> dict:
     with progress_lock:
-        data = load_json(PROGRESS_PATH, None)
-        if not isinstance(data, dict):
-            data = default_progress(n)
-        data.setdefault("questions", {})
-        data.setdefault("session", default_progress(n)["session"])
-        return data
+        return _load_progress_unlocked(n)
+
+
+def _store_progress_unlocked(data: dict) -> dict:
+    PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = PROGRESS_PATH.with_name(PROGRESS_PATH.name + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, PROGRESS_PATH)
+    return data
 
 
 def write_progress(data: dict) -> dict:
-    PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
     with progress_lock:
-        PROGRESS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    return data
+        return _store_progress_unlocked(data)
+
+
+def update_progress(mutate) -> dict:
+    """Run read-modify-write under one lock so concurrent requests cannot lose updates."""
+    with progress_lock:
+        data = _load_progress_unlocked(len(STATE["questions"]))
+        mutate(data)
+        return _store_progress_unlocked(data)
 
 
 def lan_ips() -> list[str]:
@@ -372,6 +393,15 @@ def merge_progress_item(old: dict, patch: dict) -> dict:
                 item[key] = int(patch[key])
             except (TypeError, ValueError):
                 pass
+    if "referenceImage" in patch:
+        image = patch["referenceImage"]
+        if image is None or isinstance(image, (str, dict)):
+            item["referenceImage"] = image
+    if "referenceImageAt" in patch:
+        try:
+            item["referenceImageAt"] = int(patch["referenceImageAt"])
+        except (TypeError, ValueError):
+            pass
     return item
 
 
@@ -500,19 +530,32 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if path == "/api/progress":
             payload = self._read_json()
-            data = read_progress(len(STATE["questions"]))
-            if "session" in payload and isinstance(payload["session"], dict):
-                data["session"].update(payload["session"])
-            if "question" in payload and isinstance(payload["question"], dict):
-                qid = str(payload["question"].get("id"))
-                data["questions"][qid] = merge_progress_item(data["questions"].get(qid, {}), payload["question"])
-            if payload.get("reset") == "progress":
-                data["questions"] = {}
-            write_progress(data)
+
+            def mutate(data: dict):
+                if "session" in payload and isinstance(payload["session"], dict):
+                    data["session"].update(payload["session"])
+                if "question" in payload and isinstance(payload["question"], dict):
+                    qid = str(payload["question"].get("id"))
+                    old = data["questions"].get(qid, {})
+                    patch = payload["question"]
+                    old_image = old.get("referenceImage")
+                    new_image = patch.get("referenceImage") if "referenceImage" in patch else old_image
+                    if isinstance(old_image, str) and old_image.startswith("/media/generated/") and old_image != new_image:
+                        target = (GENERATED_IMAGE_DIR / Path(old_image).name).resolve()
+                        if str(target).startswith(str(GENERATED_IMAGE_DIR.resolve())) and target.is_file():
+                            target.unlink()
+                    data["questions"][qid] = merge_progress_item(old, payload["question"])
+                if payload.get("reset") == "progress":
+                    data["questions"] = {}
+
+            data = update_progress(mutate)
             self._json(200, data)
             return
         if path == "/api/ai":
             self.handle_ai(self._read_json())
+            return
+        if path == "/api/generated-image":
+            self.handle_generated_image(self._read_json())
             return
         self._json(404, {"error": "not found"})
 
@@ -658,6 +701,35 @@ class Handler(SimpleHTTPRequestHandler):
         except Exception as e:
             self._json(500, {"error": str(e)})
 
+    def handle_generated_image(self, payload: dict):
+        try:
+            qid = int(payload.get("id"))
+        except (TypeError, ValueError):
+            self._json(400, {"error": "bad question id"})
+            return
+        if not any(q["id"] == qid for q in STATE["questions"]):
+            self._json(404, {"error": "question not found"})
+            return
+        data_url = str(payload.get("dataUrl") or "")
+        match = re.fullmatch(r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\s]+)", data_url)
+        if not match:
+            self._json(400, {"error": "只支持 png、jpeg、webp 图片"})
+            return
+        try:
+            raw = base64.b64decode(re.sub(r"\s+", "", match.group(2)), validate=True)
+        except (ValueError, base64.binascii.Error):
+            self._json(400, {"error": "图片数据无效"})
+            return
+        if not raw or len(raw) > 15 * 1024 * 1024:
+            self._json(413, {"error": "图片过大，最大 15 MB"})
+            return
+        suffix = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}[match.group(1)]
+        GENERATED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+        name = f"{qid}-{uuid.uuid4().hex}{suffix}"
+        target = GENERATED_IMAGE_DIR / name
+        target.write_bytes(raw)
+        self._json(200, {"url": f"/media/generated/{name}"})
+
     def _send_file(self, path: Path):
         data = path.read_bytes()
         ctype = MIME.get(path.suffix.lower(), "application/octet-stream")
@@ -684,7 +756,8 @@ def main():
     STATE["curated"] = curated
     STATE["config"] = cfg
     STATE["ai"] = load_ai_from_opencode(cfg)
-    roots = [bank]
+    GENERATED_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    roots = [bank, ROOT / "data"]
     for _, files in topics_cfg:
         for _, _, _, override in files:
             if override:
