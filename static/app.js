@@ -464,19 +464,32 @@ let lightboxEl = null;
 const LIGHTBOX_MAX_SCALE = 6;
 let lightboxTransform = { scale: 1, tx: 0, ty: 0 };
 
-function applyLightboxTransform(animate) {
+function updateLightboxControls() {
+  if (!lightboxEl) return;
+  const value = lightboxEl.querySelector("[data-lightbox-scale]");
+  if (value) value.textContent = `${Math.round(lightboxTransform.scale * 100)}%`;
+}
+
+function applyLightboxTransform(animate = false) {
   const img = lightboxEl.querySelector("img");
   img.style.transition = animate ? "transform 0.22s ease" : "none";
   img.style.transform = `translate(${lightboxTransform.tx}px, ${lightboxTransform.ty}px) scale(${lightboxTransform.scale})`;
+  updateLightboxControls();
+}
+
+function resetLightboxTransform(animate = true) {
+  lightboxTransform = { scale: 1, tx: 0, ty: 0 };
+  applyLightboxTransform(animate);
 }
 
 function clampLightbox() {
+  lightboxTransform.scale = Math.min(LIGHTBOX_MAX_SCALE, Math.max(1, lightboxTransform.scale));
   if (lightboxTransform.scale <= 1) {
     lightboxTransform = { scale: 1, tx: 0, ty: 0 };
   }
 }
 
-function lightboxZoomTo(scale, anchorX, anchorY, animate) {
+function lightboxZoomTo(scale, anchorX = window.innerWidth / 2, anchorY = window.innerHeight / 2, animate = true) {
   const vcX = window.innerWidth / 2;
   const vcY = window.innerHeight / 2;
   const t = lightboxTransform;
@@ -494,77 +507,68 @@ function closeLightbox() {
 
 function initLightboxGestures() {
   const pointers = new Map();
-  let pinchStart = null;
-  let panStart = null;
-  let gestureMoved = false;
+  let gesture = null;
 
   lightboxEl.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    gestureMoved = false;
     if (pointers.size === 1) {
-      panStart = { x: e.clientX, y: e.clientY, tx: lightboxTransform.tx, ty: lightboxTransform.ty, at: Date.now() };
+      gesture = {
+        type: "pan",
+        x: e.clientX,
+        y: e.clientY,
+        base: { ...lightboxTransform },
+        moved: false,
+      };
     } else if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
-      pinchStart = {
-        dist: Math.hypot(a.x - b.x, a.y - b.y),
-        scale: lightboxTransform.scale,
+      gesture = {
+        type: "pinch",
+        dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)),
         midX: (a.x + b.x) / 2,
         midY: (a.y + b.y) / 2,
+        base: { ...lightboxTransform },
       };
-      panStart = null;
     }
   });
 
   lightboxEl.addEventListener("pointermove", (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size >= 2 && pinchStart) {
+    if (pointers.size >= 2 && gesture?.type === "pinch") {
       const [a, b] = [...pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      if (Math.abs(dist - pinchStart.dist) > 2) gestureMoved = true;
-      lightboxTransform.scale = pinchStart.scale;
-      lightboxZoomTo(pinchStart.scale * dist / Math.max(1, pinchStart.dist), pinchStart.midX, pinchStart.midY, false);
-    } else if (pointers.size === 1 && panStart && lightboxTransform.scale > 1) {
-      const dx = e.clientX - panStart.x;
-      const dy = e.clientY - panStart.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) gestureMoved = true;
-      lightboxTransform.tx = panStart.tx + dx;
-      lightboxTransform.ty = panStart.ty + dy;
+      const midX = (a.x + b.x) / 2;
+      const midY = (a.y + b.y) / 2;
+      const scale = Math.min(LIGHTBOX_MAX_SCALE, Math.max(1, gesture.base.scale * dist / gesture.dist));
+      const vcX = window.innerWidth / 2;
+      const vcY = window.innerHeight / 2;
+      const imageX = (gesture.midX - vcX - gesture.base.tx) / gesture.base.scale;
+      const imageY = (gesture.midY - vcY - gesture.base.ty) / gesture.base.scale;
+      lightboxTransform = {
+        scale,
+        tx: midX - vcX - scale * imageX,
+        ty: midY - vcY - scale * imageY,
+      };
       applyLightboxTransform(false);
-    } else if (pointers.size === 1 && panStart) {
-      if (Math.abs(e.clientX - panStart.x) > 10 || Math.abs(e.clientY - panStart.y) > 10) gestureMoved = true;
+    } else if (pointers.size === 1 && gesture?.type === "pan") {
+      const dx = e.clientX - gesture.x;
+      const dy = e.clientY - gesture.y;
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) gesture.moved = true;
+      if (gesture.base.scale > 1) {
+        lightboxTransform.tx = gesture.base.tx + dx;
+        lightboxTransform.ty = gesture.base.ty + dy;
+        applyLightboxTransform(false);
+      }
     }
   });
 
   const releasePointer = (e) => {
     if (pointers.has(e.pointerId)) pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinchStart = null;
-    if (pointers.size === 0 && panStart) {
-      const quick = Date.now() - panStart.at < 350;
-      if (quick && !gestureMoved && lightboxTransform.scale === 1) closeLightbox();
-      panStart = null;
-    }
+    if (pointers.size === 0) gesture = null;
   };
   lightboxEl.addEventListener("pointerup", releasePointer);
   lightboxEl.addEventListener("pointercancel", releasePointer);
-
-  // 双击 / 双触放大
-  let lastTapAt = 0;
-  let lastTapX = 0;
-  let lastTapY = 0;
-  lightboxEl.addEventListener("pointerup", (e) => {
-    if (gestureMoved) return;
-    const now = Date.now();
-    if (now - lastTapAt < 300 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 40) {
-      const target = lightboxTransform.scale > 1 ? 1 : 2.5;
-      lightboxZoomTo(target, e.clientX, e.clientY, true);
-      lastTapAt = 0;
-    } else {
-      lastTapAt = now;
-      lastTapX = e.clientX;
-      lastTapY = e.clientY;
-    }
-  });
 
   // 桌面滚轮缩放
   lightboxEl.addEventListener("wheel", (e) => {
@@ -576,25 +580,25 @@ function initLightboxGestures() {
   // 长按不弹菜单
   lightboxEl.addEventListener("contextmenu", (e) => e.preventDefault());
 
+  lightboxEl.querySelector("[data-lightbox-out]").addEventListener("click", () => lightboxZoomTo(lightboxTransform.scale - 0.5));
+  lightboxEl.querySelector("[data-lightbox-in]").addEventListener("click", () => lightboxZoomTo(lightboxTransform.scale + 0.5));
+  lightboxEl.querySelector("[data-lightbox-reset]").addEventListener("click", () => resetLightboxTransform());
   const closeBtn = lightboxEl.querySelector(".lightbox-close");
   closeBtn.addEventListener("click", (e) => { e.stopPropagation(); closeLightbox(); });
-  closeBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
-  closeBtn.addEventListener("pointerup", (e) => e.stopPropagation());
 }
 
 function openLightbox(src) {
   if (!lightboxEl) {
     lightboxEl = document.createElement("div");
     lightboxEl.className = "image-lightbox";
-    lightboxEl.innerHTML = '<img alt="大图预览" draggable="false"><div class="lightbox-hint">双指/滚轮缩放 · 双击放大 · 单击关闭</div><button type="button" class="close-icon-btn lightbox-close" aria-label="关闭预览">✕</button>';
+    lightboxEl.innerHTML = '<img alt="大图预览" draggable="false"><div class="lightbox-hint">双指缩放 · 放大后拖动 · 也可使用下方按钮</div><div class="lightbox-controls"><button type="button" data-lightbox-out aria-label="缩小">−</button><span data-lightbox-scale>100%</span><button type="button" data-lightbox-reset>重置</button><button type="button" data-lightbox-in aria-label="放大">＋</button></div><button type="button" class="close-icon-btn lightbox-close" aria-label="关闭预览">✕</button>';
     document.body.appendChild(lightboxEl);
     initLightboxGestures();
     document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeLightbox(); });
   }
   lightboxEl.querySelector("img").src = src;
   lightboxEl.classList.add("open");
-  lightboxTransform = { scale: 1, tx: 0, ty: 0 };
-  applyLightboxTransform(true);
+  resetLightboxTransform();
 }
 
 function openImageDb() {
