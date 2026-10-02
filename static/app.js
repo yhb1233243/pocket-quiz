@@ -625,7 +625,7 @@ function saveImageConfig() {
 }
 function clearImageConfig() {
   localStorage.removeItem(AI_IMAGE_STORE); localStorage.removeItem(AI_IMAGE_BASE_STORE); localStorage.removeItem(AI_IMAGE_KEY_STORE);
-  $("ai-image-model-input").value = ""; $("ai-image-base-input").value = ""; $("ai-image-key-input").value = ""; updateImageUI();
+  $("ai-image-model-input").value = "gpt-image-2"; $("ai-image-base-input").value = ""; $("ai-image-key-input").value = ""; updateImageUI();
 }
 
 function setRecordStatus(text, error = false) {
@@ -1330,7 +1330,7 @@ async function boot() {
     if (e.key === "Enter") { e.preventDefault(); saveSpeechConfig(); }
   });
   updateSpeechUI();
-  $("ai-image-model-input").value = localStorage.getItem(AI_IMAGE_STORE) || "";
+  $("ai-image-model-input").value = localStorage.getItem(AI_IMAGE_STORE) || "gpt-image-2";
   $("ai-image-base-input").value = imageBaseUrl();
   $("ai-image-save").onclick = saveImageConfig;
   $("ai-image-clear").onclick = clearImageConfig;
