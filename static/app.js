@@ -461,17 +461,140 @@ function safeImageSrc(src) {
 }
 
 let lightboxEl = null;
+const LIGHTBOX_MAX_SCALE = 6;
+let lightboxTransform = { scale: 1, tx: 0, ty: 0 };
+
+function applyLightboxTransform(animate) {
+  const img = lightboxEl.querySelector("img");
+  img.style.transition = animate ? "transform 0.22s ease" : "none";
+  img.style.transform = `translate(${lightboxTransform.tx}px, ${lightboxTransform.ty}px) scale(${lightboxTransform.scale})`;
+}
+
+function clampLightbox() {
+  if (lightboxTransform.scale <= 1) {
+    lightboxTransform = { scale: 1, tx: 0, ty: 0 };
+  }
+}
+
+function lightboxZoomTo(scale, anchorX, anchorY, animate) {
+  const vcX = window.innerWidth / 2;
+  const vcY = window.innerHeight / 2;
+  const t = lightboxTransform;
+  const px = (anchorX - vcX - t.tx) / t.scale;
+  const py = (anchorY - vcY - t.ty) / t.scale;
+  const s = Math.min(LIGHTBOX_MAX_SCALE, Math.max(1, scale));
+  lightboxTransform = { scale: s, tx: anchorX - vcX - s * px, ty: anchorY - vcY - s * py };
+  clampLightbox();
+  applyLightboxTransform(animate);
+}
+
+function closeLightbox() {
+  lightboxEl.classList.remove("open");
+}
+
+function initLightboxGestures() {
+  const pointers = new Map();
+  let pinchStart = null;
+  let panStart = null;
+  let gestureMoved = false;
+
+  lightboxEl.addEventListener("pointerdown", (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    gestureMoved = false;
+    if (pointers.size === 1) {
+      panStart = { x: e.clientX, y: e.clientY, tx: lightboxTransform.tx, ty: lightboxTransform.ty, at: Date.now() };
+    } else if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchStart = {
+        dist: Math.hypot(a.x - b.x, a.y - b.y),
+        scale: lightboxTransform.scale,
+        midX: (a.x + b.x) / 2,
+        midY: (a.y + b.y) / 2,
+      };
+      panStart = null;
+    }
+  });
+
+  lightboxEl.addEventListener("pointermove", (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size >= 2 && pinchStart) {
+      const [a, b] = [...pointers.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (Math.abs(dist - pinchStart.dist) > 2) gestureMoved = true;
+      lightboxTransform.scale = pinchStart.scale;
+      lightboxZoomTo(pinchStart.scale * dist / Math.max(1, pinchStart.dist), pinchStart.midX, pinchStart.midY, false);
+    } else if (pointers.size === 1 && panStart && lightboxTransform.scale > 1) {
+      const dx = e.clientX - panStart.x;
+      const dy = e.clientY - panStart.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) gestureMoved = true;
+      lightboxTransform.tx = panStart.tx + dx;
+      lightboxTransform.ty = panStart.ty + dy;
+      applyLightboxTransform(false);
+    } else if (pointers.size === 1 && panStart) {
+      if (Math.abs(e.clientX - panStart.x) > 10 || Math.abs(e.clientY - panStart.y) > 10) gestureMoved = true;
+    }
+  });
+
+  const releasePointer = (e) => {
+    if (pointers.has(e.pointerId)) pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchStart = null;
+    if (pointers.size === 0 && panStart) {
+      const quick = Date.now() - panStart.at < 350;
+      if (quick && !gestureMoved && lightboxTransform.scale === 1) closeLightbox();
+      panStart = null;
+    }
+  };
+  lightboxEl.addEventListener("pointerup", releasePointer);
+  lightboxEl.addEventListener("pointercancel", releasePointer);
+
+  // 双击 / 双触放大
+  let lastTapAt = 0;
+  let lastTapX = 0;
+  let lastTapY = 0;
+  lightboxEl.addEventListener("pointerup", (e) => {
+    if (gestureMoved) return;
+    const now = Date.now();
+    if (now - lastTapAt < 300 && Math.hypot(e.clientX - lastTapX, e.clientY - lastTapY) < 40) {
+      const target = lightboxTransform.scale > 1 ? 1 : 2.5;
+      lightboxZoomTo(target, e.clientX, e.clientY, true);
+      lastTapAt = 0;
+    } else {
+      lastTapAt = now;
+      lastTapX = e.clientX;
+      lastTapY = e.clientY;
+    }
+  });
+
+  // 桌面滚轮缩放
+  lightboxEl.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const factor = Math.exp(-e.deltaY * 0.0018);
+    lightboxZoomTo(lightboxTransform.scale * factor, e.clientX, e.clientY, false);
+  }, { passive: false });
+
+  // 长按不弹菜单
+  lightboxEl.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  const closeBtn = lightboxEl.querySelector(".lightbox-close");
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); closeLightbox(); });
+  closeBtn.addEventListener("pointerdown", (e) => e.stopPropagation());
+  closeBtn.addEventListener("pointerup", (e) => e.stopPropagation());
+}
+
 function openLightbox(src) {
   if (!lightboxEl) {
     lightboxEl = document.createElement("div");
     lightboxEl.className = "image-lightbox";
-    lightboxEl.innerHTML = '<img alt="大图预览">';
-    lightboxEl.addEventListener("click", () => lightboxEl.classList.remove("open"));
+    lightboxEl.innerHTML = '<img alt="大图预览" draggable="false"><div class="lightbox-hint">双指/滚轮缩放 · 双击放大 · 单击关闭</div><button type="button" class="close-icon-btn lightbox-close" aria-label="关闭预览">✕</button>';
     document.body.appendChild(lightboxEl);
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape") lightboxEl.classList.remove("open"); });
+    initLightboxGestures();
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeLightbox(); });
   }
   lightboxEl.querySelector("img").src = src;
   lightboxEl.classList.add("open");
+  lightboxTransform = { scale: 1, tx: 0, ty: 0 };
+  applyLightboxTransform(true);
 }
 
 function openImageDb() {
