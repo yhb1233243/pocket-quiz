@@ -186,3 +186,13 @@ data/                运行时进度与生成图片，不提交到 Git
 仓库中的部分题库属于已确认获得公开再分发授权的内容，题库授权范围与代码许可证分开，详见 [BANK-NOTICE.md](BANK-NOTICE.md)。
 
 如果 Pocket Quiz 对你的面试准备有帮助，欢迎 Star、反馈问题或贡献题库格式改进。
+
+## 界面预览
+
+### 桌面端
+
+![Pocket Quiz 桌面端](docs/screenshots/desktop.png)
+
+### 手机端
+
+![Pocket Quiz 手机端](docs/screenshots/mobile.png)
