@@ -1,84 +1,136 @@
-# Pocket Quiz | 全栈 AI 智能面试突击站 🚀
+# Pocket Quiz
+
+## AI 驱动的本地化技术面试训练工具
+
+Pocket Quiz 是一个面向 Java、Python、大模型与后端开发者的面试训练站。
+
+它把本地 Markdown 题库变成一个可以真正“刷起来”的学习系统：你可以逐题作答、口头模拟面试、让 AI 分析答案、记录掌握情况，并按照复习节奏重新巩固薄弱知识点。
+
+项目运行在自己的电脑上，支持手机通过局域网访问，也可以打包成单个 HTML 文件离线使用。
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/Dependencies-Zero%20(Stdlib%20Only)-success?style=for-the-badge" alt="Zero Dependencies">
-  <img src="https://img.shields.io/badge/Frontend-Vanilla%20JS%20%2B%20CSS-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="Vanilla">
-  <img src="https://img.shields.io/badge/AI-OpenAI%20%7C%20Qwen%20%7C%20DeepSeek-8A2BE2?style=for-the-badge" alt="AI Ready">
-  <img src="https://img.shields.io/badge/License-Apache%202.0-blue?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/Dependencies-None-2ea44f?style=flat-square" alt="No dependencies">
+  <img src="https://img.shields.io/badge/Frontend-Vanilla%20JS-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="Vanilla JavaScript">
+  <img src="https://img.shields.io/badge/License-Apache%202.0-2563eb?style=flat-square" alt="Apache 2.0">
 </p>
 
-<p align="center">
-  <b>面向架构师与高工的次世代私有化面试助手</b><br>
-  本地 Markdown 题库驱动 · 真实口头模拟作答 · 艾宾浩斯科学抗遗忘 · AI 架构图解生成 · 局域网跨端无缝协同
-</p>
+## 适合谁
 
----
+- 正在准备 Java 后端、架构师或全栈开发岗位面试的人
+- 想把 Obsidian、Markdown 或个人笔记变成可交互题库的人
+- 希望练习“开口回答”，而不是只看答案的人
+- 需要在电脑和手机之间切换学习设备的人
+- 不想安装 Node.js、数据库或一堆第三方依赖的人
 
-## 🌟 为什么选择 Pocket Quiz？
+## 核心能力
 
-传统刷题网站要么充满广告与付费墙，要么不支持私人题库；普通 Markdown 笔记又缺乏交互感和复习节奏。
+### 1. 从本地 Markdown 题库开始
 
-**Pocket Quiz** 专为高强度备战技术面试设计：**无需安装任何依赖（零 pip 安装、前端零 node_modules）**，单命令即可启动。不仅能在 PC 端沉浸式背题，更能在手机或平板上通过局域网秒级同频刷题，甚至支持全量内联打包为单个 HTML 文件断网携带。
+题库文件放在本地，项目负责解析和展示。内置支持：
 
----
+- Java 核心语法、集合、并发、JVM、MySQL、Redis、Kafka、Spring 等
+- 数据结构与算法
+- Python 与大模型算法相关题目
+- 自己维护的 Markdown 题库
 
-## 🔥 核心特性矩阵
+支持三种常用题目格式：
 
-### 🎙️ 1. 真实面试口语模拟（Oral Simulation）
-- **告别哑巴背题**：支持直接语音录入作答（支持阿里 Qwen3-ASR 或浏览器原生语音），还原真实面试开口状态。
-- **AI 考官精准评估**：从表达流畅度、核心要点命中率、深度原理解析等维度提供即时打分与连环追问预测。
-- **历史作答轨迹追踪**：保留历次作答记录与得分演变，肉眼可见自己的表达能力进化。
+- `h1`：以 `# 1. 题目` 切分
+- `h2`：以 `## 1. 题目` 切分
+- `flashcard`：使用 `问题::答案` 创建闪卡
 
-### 🖼️ 2. AI 架构解析生图（Visual Diagramming）
-- **一图胜千言**：接入 GPT Image 2 等前沿视觉模型，一键为抽象枯燥的技术原理生成极简、直观的高清架构图与流程图。
-- **本题参考图持久化**：生成满意后一键固化为本题专属参考图，内嵌在答案首部；支持全屏沉浸式灯箱放大查看。
-- **在线/离线双重存储**：在线版自动落地服务端并安全防丢，离线版直接写入浏览器 IndexedDB。
+答案中的本地图片也可以直接展示；`#### 背会` 或 `#### 口诀` 内容会作为精简版答案，用于背题模式。
 
-### 🧠 3. 艾宾浩斯智能间隔复习（Spaced Repetition）
-- **科学抗遗忘曲线**：内置 0 / 1 / 3 / 7 / 14 天智能阶梯复习算法。
-- **今日待复习靶向筛选**：根据记忆衰减曲线动态计算今日复习池，精准打击遗忘临界点，背过就不再忘。
+### 2. 面试模式与背题模式
 
-### 🤖 4. 全能 AI 助教生态（AI Mentor）
-- **动态模型感知**：填入 OpenAI 兼容 Key 后自动探测可用模型列表（DeepSeek、GPT-4o、Claude、Qwen 等自由切换）。
-- **结构化解题方案**：自带「🗣️ 面试怎么开口」、「⚡ 核心原理解析」、「⚠️ 易错点与连环追问」、「🎯 核心速记口诀」四大金牌维度。
+- **刷题模式**：先看问题，自己思考或作答后再查看答案
+- **背题模式**：直接显示结构化答案，快速过一遍知识点
+- **不会、掌握、收藏**：给题目添加状态，后续按条件筛选
+- **今日待复习**：只查看当前需要复习的题目
 
-### 📦 5. 极致工程美学：零依赖与双模态架构
-- **极简服务端**：纯 Python 标准库编写（`http.server` + `socketserver`），无任何第三方三方库负担。
-- **工业级数据安全**：原子化写入（Atomic Write）与并发事务加锁，防止多端并发与意外断电造成进度丢失。
-- **单文件离线版**：一键打包出包含千道题目、百张高清配图、离线数据库的单个独立 HTML 文件，随时随地随身刷。
+### 3. 口头作答与 AI 评价
 
----
+可以直接在浏览器中录音作答，再将回答交给 AI 进行分析。AI 助教可以帮助整理：
 
-## ⚡ 极速起步
+- 面试时应该如何开口
+- 核心原理和关键流程
+- 易错点与可能的追问
+- 适合短时间复习的速记版本
 
-### 1. 本地启动服务
+AI 接口采用 OpenAI 兼容协议，可以在页面中配置接口地址、API Key 和模型。项目不会强制绑定某一家模型服务。
+
+### 4. AI 生成答案参考图
+
+对于 JVM、并发、Redis、消息队列、分布式等适合图解的题目，可以调用图像模型生成答案参考图。
+
+使用流程：
+
+1. 在“答案图片模型”中填写图片接口和模型
+2. 点击“生成答案图”
+3. 预览图片，确认后保存为本题参考图
+4. 在答案区域查看，点击图片可放大
+
+在线版的图片保存在 `data/generated/`，离线版使用浏览器 IndexedDB 保存。
+
+### 5. 间隔复习
+
+项目会记录每道题的学习状态，并按照 `0 / 1 / 3 / 7 / 14` 天的复习间隔安排后续复习，帮助把“看过”变成“记住”。
+
+### 6. 在线与离线两种方式
+
+**在线版**适合电脑和手机协同使用：
+
+- Python 标准库启动，无需安装第三方依赖
+- 同一 Wi-Fi 下手机可以直接访问
+- 进度和生成图片保存在服务端
+- 支持本地 Markdown 图片和题库
+
+**离线版**适合没有网络时使用：
+
+- 一条命令生成单个 HTML 文件
+- 题库和图片会内嵌到文件中
+- 双击即可打开，不需要启动服务器
+- 进度和参考图保存在浏览器本地
+
+## 快速开始
+
+### 启动在线版
+
 ```bash
 python server.py
 ```
-终端会输出本机及局域网访问地址：
-```text
-======================================================================
-  Pocket Quiz 已启动 (无访问密码)
-  本机访问:   http://127.0.0.1:8765
-  局域网访问: http://192.168.x.x:8765 (手机连接同一 Wi-Fi 直接访问)
-======================================================================
-```
-*手机连入同一 Wi-Fi，用浏览器打开局域网地址即可开始移动端刷题。*
 
-### 2. 导出单文件离线版
+打开终端打印的地址：
+
+```text
+本机：   http://127.0.0.1:8765
+局域网： http://192.168.x.x:8765
+```
+
+手机和电脑连接同一个 Wi-Fi 后，使用手机浏览器打开局域网地址即可。
+
+如果 Windows 防火墙弹出提示，请允许 Python 在当前网络中通信。
+
+### 生成离线版
+
 ```bash
 python build_static.py
 ```
-将在当前目录生成 `面试刷题-离线版.html`（所有静态资源、题库、图片已全部转为 Base64/内联脚本），双击即可断网运行，进度由 IndexedDB 自动维护。
 
----
+命令会生成 `面试刷题-离线版.html`，双击即可使用。
 
-## ⚙️ 接入专属题库
+## 接入自己的题库
 
-仓库已内置包含 **Java 全技术栈、算法、Python、大模型算法（LLM/微调/LangChain）** 等海量高质量题库。若想挂载你自己的知识库：
+复制配置文件：
 
-1. 复制 `config.example.json` 为 `config.json`，指定题库目录：
+```bash
+copy config.example.json config.json
+copy topics.example.json topics.json
+```
+
+在 `config.json` 中指定题库目录：
+
 ```json
 {
   "bank_dir": "E:/MyNotes/InterviewQuestions",
@@ -86,58 +138,51 @@ python build_static.py
   "password": ""
 }
 ```
-2. 复制 `topics.example.json` 为 `topics.json`，定制你的专属分类树：
+
+在 `topics.json` 中配置专题、模块和文件：
+
 ```json
 [
   {
-    "topic": "系统架构",
+    "topic": "Java 基础",
     "files": [
-      { "module": "高并发与高可用", "file": "分布式架构.md", "parse": "h1" }
+      {
+        "module": "语言基础",
+        "file": "Java语言.md",
+        "parse": "h1"
+      }
     ]
   }
 ]
 ```
 
-### 支持的 Markdown 解析策略
-- **`parse: "h1"`**：以一级标题 `# 1. 问题` 切割题目。
-- **`parse: "h2"`**：以二级标题 `## 1. 问题` 切割题目。
-- **`parse: "flashcard"`**：双冒号闪卡模式，`问题::答案`，快速过知识点。
+如果通过局域网分享，建议在 `config.json` 中设置 `password`。
 
----
+## 项目结构
 
-## 🛠️ 技术栈与架构设计
-
-```
-[ 终端设备: PC / Mac / iPad / iPhone / Android ]
-                        │
-                        ▼ (HTTP / WebSocket-less REST)
-┌────────────────────────────────────────────────────────┐
-│               Python 纯原生标准库服务端                  │
-│  - ThreadingHTTPServer (多线程高并发)                   │
-│  - Atomic Safe Progress Engine (原子化事务持久层)       │
-│  - Media & Generated Image Pipeline (静态与生成图管线)  │
-└────────────────────────────────────────────────────────┘
-          │                                  │
-          ▼                                  ▼
-┌──────────────────┐               ┌──────────────────┐
-│   本地 Markdown   │               │   大语言/图像模型   │
-│   Obsidian 题库   │               │   OpenAI / Qwen  │
-└──────────────────┘               └──────────────────┘
+```text
+server.py            在线版服务端
+build_static.py      离线单文件打包器
+static/              前端页面、样式与脚本
+bank/                示例题库与公开题库
+topics.json          当前加载的题库清单
+config.example.json  服务端配置示例
+curated_answers.json 人工整理的答案补充
+data/                运行时进度与生成图片，不提交到 Git
 ```
 
-- **后端**：Python 3.10+ 标准库（`http.server`, `threading`, `json`, `pathlib`）
-- **前端**：Vanilla HTML5 / Modern CSS (深色极客主题、CSS 变量、弹性响应式) / 原生 ES6+
-- **离线存储**：IndexedDB（图片与重型资源） + LocalStorage（配置与轻量会话）
+## 技术栈
 
----
+- Python 标准库：`http.server`、`socketserver`、`threading`、`json`、`pathlib`
+- 原生 HTML、CSS、JavaScript，无前端构建流程
+- Markdown 题库解析与本地媒体服务
+- LocalStorage 保存配置，IndexedDB 保存离线图片
+- OpenAI 兼容接口：文本模型、语音模型与图像模型
 
-## 📜 开源协议
+## 题库与许可证
 
-- **软件代码与原创示例题库**：采用 [Apache-2.0 License](LICENSE)。
-- **第三方授权题库**：题库版权与授权范围以 [BANK-NOTICE.md](BANK-NOTICE.md) 为准。
+程序代码与原创示例题库使用 Apache-2.0，详见 [LICENSE](LICENSE)。
 
----
+仓库中的部分题库属于已确认获得公开再分发授权的内容，题库授权范围与代码许可证分开，详见 [BANK-NOTICE.md](BANK-NOTICE.md)。
 
-<p align="center">
-  <b>如果这个项目对你的面试突击有所帮助，欢迎点亮右上角的 ⭐️ Star 支持一下！</b>
-</p>
+如果 Pocket Quiz 对你的面试准备有帮助，欢迎 Star、反馈问题或贡献题库格式改进。
